@@ -1,0 +1,13 @@
+DirectoryIndex index.json
+
+<IfModule mod_autoindex.c>
+    DirectoryIndex index.json
+</IfModule>
+
+<FilesMatch "^(checkService|index)\.php$">
+    Require all granted
+</FilesMatch>
+
+<FilesMatch ".+\.php$">
+    Require all denied
+</FilesMatch>
