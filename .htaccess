@@ -1,9 +1,5 @@
 DirectoryIndex index.json
 
-<IfModule mod_autoindex.c>
-    DirectoryIndex index.json
-</IfModule>
-
 <FilesMatch "^(checkService|index)\.php$">
     Require all granted
 </FilesMatch>
@@ -11,3 +7,6 @@ DirectoryIndex index.json
 <FilesMatch ".+\.php$">
     Require all denied
 </FilesMatch>
+
+RewriteEngine on
+RewriteRule ^$ /api/ [L]

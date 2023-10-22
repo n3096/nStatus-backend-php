@@ -33,18 +33,19 @@ function check(Service $service): ?ServiceCheck {
         fclose($resource);
     }
 
-    if ($errorCode)
-        if ($errorCode != 10061) { // filter common unreachable error code
+    if($errorCode != 10061) { // filter common unreachable error code
+        if ($errorCode)
             $notes["errorCode"] = $errorCode;
-        }
-    if ($errMessage)
-        $notes["errMessage"] = $errMessage;
+        if ($errMessage)
+            $notes["errMessage"] = $errMessage;
+    }
     
     if ($status === Status::REACHABLE && sizeof($notes) > 0)
         $status = Status::WARNING;
 
     if(empty($response))
         $response = (object)[];
+
     return new ServiceCheck($service->hostName, $service->port, $service->socketProtocol, $actualHostName, $dateTime, $latency, $ipv4, $ipv6, $forwardedHost, $status, $response, $notes);
 }
 
@@ -118,15 +119,15 @@ function getResponseForHttpAndHttps($resource, Service $service, Status &$status
     return $result;
 }
 
-$service = new Service("Phiwi", "www.phiwi.de", SocketProtocol::HTTPS, 443);
+$service = new Service(null, "Phiwi", "www.phiwi.de", SocketProtocol::HTTPS, 443, "server");
 echo json_encode(check($service));
 echo "\n";
 
-$service2 = new Service("Phiwi", "phiwi.de", SocketProtocol::HTTPS, 443);
+$service2 = new Service(null, "Phiwi", "phiwi.de", SocketProtocol::HTTPS, 443, "server");
 echo json_encode(check($service2));
 echo "\n";
 
-$service3 = new Service("MC", "localhost", SocketProtocol::UDP, 25565);
+$service3 = new Service(null, "MC", "localhost", SocketProtocol::UDP, 25565, "server");
 echo json_encode(check($service3));
 echo "\n";
 
@@ -134,6 +135,6 @@ echo "\n";
 //echo json_encode(check($service4));
 //echo "\n";
 
-$service5 = new Service("Google", "www.google.com", SocketProtocol::HTTPS, 443);
+$service5 = new Service(null, "Google", "www.google.com", SocketProtocol::HTTPS, 443, "server");
 echo json_encode(check($service5));
 echo "\n";
