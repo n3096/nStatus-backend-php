@@ -1,17 +1,18 @@
 DirectoryIndex index.json
 
-<FilesMatch "^(checkService|index)\.php$">
+<FilesMatch ".+\.php.*$">
+    Require all denied
+</FilesMatch>
+<FilesMatch "^(getServiceChecks?)\.php.*$">
     Require all granted
 </FilesMatch>
 
-<FilesMatch ".+\.php$">
-    Require all denied
-</FilesMatch>
-
-
 RewriteEngine On
-RewriteCond %{QUERY_STRING} live=true
-RewriteCond %{REQUEST_URI} ^/services/([A-Za-z0-9]+)/status$
-RewriteRule ^ /api/services/getLiveStatus.php?id=%1 [L,QSA]
+RewriteCond %{REQUEST_URI} ^.*/services/serviceCheck$
+RewriteRule ^ ./getServiceChecks.php [L]
 
-RewriteRule ^$ /api/ [L]
+RewriteCond %{REQUEST_URI} ^.*/services/([A-Za-z0-9]+)/serviceCheck$
+RewriteRule ^ ./getServiceCheck.php?id=%1 [L]
+
+RewriteCond %{ENV:REDIRECT_STATUS} ^$
+RewriteRule ^(.*)$ api/$1 [L]

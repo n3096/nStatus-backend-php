@@ -10,18 +10,13 @@ enum SocketProtocol: string {
     case HTTPS = "HTTPS";
     case UDP = "UDP";
 
-    public static function parse(string $socketProtocol) {
-        switch ($socketProtocol) {
-            case self::TCP->value:
-                return self::TCP;
-            case self::HTTP->value:
-                return self::HTTP;
-            case self::HTTPS->value:
-                return self::HTTPS;
-            case self::UDP->value:
-                return self::UDP;
-            default:
-                throw new InvalidArgumentException("Invalid SocketProtocol: '$socketProtocol'");
-        }
+    public static function parse(string $socketProtocol): SocketProtocol {
+        return match ($socketProtocol) {
+            self::TCP->value => self::TCP,
+            self::HTTP->value => self::HTTP,
+            self::HTTPS->value => self::HTTPS,
+            self::UDP->value => self::UDP,
+            default => throw new InvalidArgumentException("Invalid SocketProtocol: '$socketProtocol'"),
+        };
     }
 }

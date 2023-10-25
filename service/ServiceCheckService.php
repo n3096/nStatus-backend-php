@@ -13,13 +13,16 @@ class ServiceCheckService {
     private function __construct() {}
 
     static public function checkServices(): void {
-        ServiceCheckThreaderService::checkServicesMultithreaded(ConfigurationService::getServices());
+        $serviceCheckMap = ServiceCheckThreaderService::checkServicesMultithreaded(ConfigurationService::getServices());
+
+        $fileHandler = fopen(__DIR__ . '/../api/index.json', "w");
+        fwrite($fileHandler, json_encode($serviceCheckMap));
+        fclose($fileHandler);
     }
 
-    static public function checkService(string $data, string $salt): ?ServiceCheck {
+    static public function checkService(?string $data, ?string $salt): ServiceCheck|FALSE {
         $service = ServiceCheckThreaderService::parseService($data, $salt);
-        if ($service == null)
-            return null;
+        if (!$service) return FALSE;
 
         $notes = [];
         $response = [];
@@ -27,9 +30,9 @@ class ServiceCheckService {
         $fullHostName = self::getActualHostName($forwardedHost ?: $service->hostName, $service->socketProtocol);
 
         $dateTime = new DateTimeSerializable();
-        $latencyStart = microtime(true);
+        $latencyStart = microtime(TRUE);
         $resource = fsockopen($fullHostName, $service->port, $errorCode, $errMessage, $service->timeout);
-        $latency = intval((microtime(true) - $latencyStart) * 1000); // convert to micro seconds
+        $latency = intval((microtime(TRUE) - $latencyStart) * 1000); // convert to milliseconds
 
         if (!$resource) {
             $status = Status::UNREACHABLE;
@@ -39,7 +42,7 @@ class ServiceCheckService {
             fclose($resource);
         }
 
-        if ($errorCode != 10061) { // filter common unreachable error code
+        if ($errorCode != 10061) { // filter for common unreachable error code
             if ($errorCode)
                 $notes["errorCode"] = $errorCode;
             if ($errMessage)
