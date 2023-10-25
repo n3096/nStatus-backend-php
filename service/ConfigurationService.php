@@ -8,23 +8,34 @@ use model\Service;
 use model\SocketProtocol;
 
 class ConfigurationService {
+    static private string $CONFIGURATION_FILE = __DIR__ . '/../configuration.json';
+    static private int $configurationFileLastChanged = 0;
     static private array $servers = [];
     static private array $services = [];
 
+    private function __construct() {
+    }
+
     static public function getServers(): array {
-        if (sizeof(self::$servers) == 0)
+        if (sizeof(self::$servers) == 0 || self::hasConfigurationFileChanged())
             self::load();
         return self::$servers;
     }
 
     static public function getServices(): array {
-        if (sizeof(self::$services) == 0)
+        if (sizeof(self::$services) == 0 || self::hasConfigurationFileChanged())
             self::load();
         return self::$services;
     }
 
+    static private function hasConfigurationFileChanged(): bool {
+        $configurationFileLastChanged = self::$configurationFileLastChanged;
+        self::$configurationFileLastChanged = filemtime(self::$CONFIGURATION_FILE);
+        return $configurationFileLastChanged != self::$configurationFileLastChanged;
+    }
+
     static private function load(): void {
-        $rawConfiguration = file_get_contents(__DIR__ . '/../configuration.json');
+        $rawConfiguration = file_get_contents(self::$CONFIGURATION_FILE);
         $configuration = json_decode($rawConfiguration, true);
         self::validateConfiguration($configuration);
 

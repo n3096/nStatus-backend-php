@@ -20,7 +20,10 @@ coverage
 *.sw?
 
 # generated rest-jsons
-api/**/
+api/**/*.json
 
 # configuration
 configuration.json
+
+# temporary files
+tmp
