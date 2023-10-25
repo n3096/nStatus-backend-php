@@ -8,5 +8,10 @@ DirectoryIndex index.json
     Require all denied
 </FilesMatch>
 
-RewriteEngine on
+
+RewriteEngine On
+RewriteCond %{QUERY_STRING} live=true
+RewriteCond %{REQUEST_URI} ^/services/([A-Za-z0-9]+)/status$
+RewriteRule ^ /api/services/getLiveStatus.php?id=%1 [L,QSA]
+
 RewriteRule ^$ /api/ [L]
