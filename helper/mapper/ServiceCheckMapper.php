@@ -10,7 +10,7 @@ use stdClass;
 
 class ServiceCheckMapper {
     public function __invoke(stdClass $object): ServiceCheck {
-        return new ServiceCheck($object->hostName, $object->port, SocketProtocol::parse($object->socketProtocol), $object->fullHostName, DateTimeSerializable::parse($object->timestamp), $object->latency, $object->ipv4, $object->ipv6, $object->forwardedHost, Status::parse($object->status), $object->response, $object->notes);
+        return new ServiceCheck($object->hostName, $object->port, SocketProtocol::parse($object->socketProtocol), $object->fullHostName, DateTimeSerializable::parse($object->timestamp), $object->latency, $object->ipv4, $object->ipv6, $object->forwardedHost, Status::parse($object->status), $object->response, (array)$object->notes);
     }
 
     static public function map(): callable {

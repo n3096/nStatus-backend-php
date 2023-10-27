@@ -1,6 +1,8 @@
 <?php
 
 error_reporting(0);
+ignore_user_abort(true);
+set_time_limit(300);
 
 require_once 'autoloader.php';
 
@@ -23,5 +25,4 @@ try {
     exit('{"status": "unknown"}');
 }
 
-header("Date: {$_SERVER['HTTP_DATE']}");
 echo json_encode($response);

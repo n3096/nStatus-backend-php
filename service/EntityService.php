@@ -2,50 +2,34 @@
 
 namespace service;
 
-use helper\mapper\ConfigurationMapper;
-use model\configuration\LogFile;
 use model\Service;
 
 class EntityService {
-    static private string $CONFIGURATION_FILE = __DIR__ . '/../configuration.json';
-    static private int $configurationFileLastChanged = 0;
+
     static private array $servers = [];
     static private array $services = [];
-
-    private function __construct() {}
-
     static public function getServers(): array {
-        self::loadConfigurationWhenNecessary();
+        self::loadEntitiesWhenNecessary();
         return self::$servers;
     }
 
     static public function getServices(): array {
-        self::loadConfigurationWhenNecessary();
+        self::loadEntitiesWhenNecessary();
         return self::$services;
     }
 
     static public function getService(string $id): Service|FALSE {
-        self::loadConfigurationWhenNecessary();
-        return array_filter(self::$services, function ($service) use ($id) {return $service->id === $id;})[0] ?? FALSE;
+        $servicesWithId = array_filter(self::getServices(), function ($service) use ($id) {return $service->id === $id;});
+        return array_shift($servicesWithId) ?? FALSE;
+    }
+    static private function loadEntitiesWhenNecessary(): void {
+        if (sizeof(self::$services) == 0 || sizeof(self::$servers) == 0 || ConfigurationService::hasChanges(self::class))
+            self::loadEntities();
     }
 
-    static private function loadConfigurationWhenNecessary(): void {
-        if (sizeof(self::$services) == 0 || sizeof(self::$servers) == 0 || self::hasConfigurationFileChanged())
-            self::load();
-    }
-
-    static private function hasConfigurationFileChanged(): bool {
-        $configurationFileLastChanged = self::$configurationFileLastChanged;
-        self::$configurationFileLastChanged = filemtime(self::$CONFIGURATION_FILE);
-        return $configurationFileLastChanged != self::$configurationFileLastChanged;
-    }
-
-    static private function load(): void {
-        LogService::info(LogFile::CONFIGURATION, 'Load configuration');
-
-        $configuration = FileService::parseFile(self::$CONFIGURATION_FILE, new ConfigurationMapper());
-
-        self::$servers = self::removeDisabledServices($configuration->servers);
+    static private function loadEntities(): void {
+        $servers = ConfigurationService::get("servers", self::class);
+        self::$servers = self::removeDisabledServices($servers);
         self::$services = self::flatServiceLists(self::$servers);
     }
 

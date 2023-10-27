@@ -6,6 +6,7 @@ use CurlHandle;
 use CurlMultiHandle;
 use Exception;
 use model\configuration\LogFile;
+use model\DateTimeSerializable;
 use model\security\nSecure;
 use model\Service;
 use model\ServiceCheck;
@@ -40,8 +41,9 @@ class ServiceCheckMultithreadingService {
 
         $multiCurlHandler = curl_multi_init();
         $serviceCurlMap = [];
+        $hostUrl = self::getHostUrl();
         foreach($services as $service) {
-            if ($curl = self::getServiceCurlHandle($service, $hash, $salts, $headerDate)) {
+            if ($curl = self::getServiceCurlHandle($service, $hash, $salts, $hostUrl, $headerDate)) {
                 curl_multi_add_handle($multiCurlHandler, $curl);
                 $serviceCurlMap[] = ['service' => $service, 'curl' => $curl];
             } else {
@@ -77,10 +79,10 @@ class ServiceCheckMultithreadingService {
         }
     }
 
-    static private function getServiceCurlHandle(Service $service, string $hash, array $salts, string $headerDate): CurlHandle|FALSE {
+    static private function getServiceCurlHandle(Service $service, string $hash, array $salts, string $hostUrl, string $headerDate): CurlHandle|FALSE {
         $timeout = $service->timeout + 5;
         $serviceHash = nSecure::encrypt($service, $hash, $salts);
-        $url = "{$_SERVER['SERVER_NAME']}/status/api/services/$serviceHash/serviceCheck";
+        $url = "{$hostUrl}api/services/$serviceHash/serviceCheck";
 
         if ($curl = curl_init()) {
             curl_setopt($curl, CURLOPT_URL, $url);
@@ -97,6 +99,15 @@ class ServiceCheckMultithreadingService {
         return $curl;
     }
 
+    static public function getHostUrl(): string {
+        $basePaths = ConfigurationService::get("basePaths", self::class);
+        $serverName = $_SERVER['SERVER_NAME'] ?? "localhost";
+        $basePath = $basePaths[$serverName] ?? $basePaths[0] ?? "";
+        if (!empty($basePath) && !str_ends_with($basePath, '/'))
+            $basePath .= '/';
+        return "https://$serverName/$basePath";
+    }
+
     static private function executeAndWaitMultiCurl(CurlMultiHandle $multiCurlHandler): void {
         do {
             $status = curl_multi_exec($multiCurlHandler, $isRunning);
@@ -110,22 +121,17 @@ class ServiceCheckMultithreadingService {
             LogService::error(LogFile::SERVICE_MULTITHREADING, "Could not internally curl ServiceCheck for service with id '$service->id' due to http '$httpResponseCode'");
             return FALSE;
         }
-        $response = curl_multi_getcontent($curlHandle);
-        $headerSize = curl_getinfo($curlHandle, CURLINFO_HEADER_SIZE);
-        $header = substr($response, 0, $headerSize);
 
-        preg_match('/Date:.*/m', $header, $dateMatches);
-        if (!isset($dateMatches[0]) || $dateMatches[0] != $headerDate) {
-            LogService::error(LogFile::SERVICE_MULTITHREADING, "Response of internal ServiceCheck curl for service with id '$service->id' does not contain header 'Date'");
-            return FALSE;
-        }
         try {
+            $response = curl_multi_getcontent($curlHandle);
+            $headerSize = curl_getinfo($curlHandle, CURLINFO_HEADER_SIZE);
             $response = substr($response, $headerSize);
+
             $serviceCheckMap = json_decode($response, TRUE);
-            $serviceCheck = ServiceCheck::createByService(
+            return ServiceCheck::createByService(
                 $service,
                 $serviceCheckMap['fullHostName'],
-                $serviceCheckMap['timestamp'],
+                DateTimeSerializable::parse($serviceCheckMap['timestamp']),
                 $serviceCheckMap['latency'],
                 $serviceCheckMap['ipv4'],
                 $serviceCheckMap['ipv6'],
@@ -133,10 +139,9 @@ class ServiceCheckMultithreadingService {
                 Status::parse($serviceCheckMap['status']),
                 $serviceCheckMap['response'],
                 $serviceCheckMap['notes']);
-        } catch (Exception) {
-            LogService::error(LogFile::SERVICE_MULTITHREADING, "Could not parse response of internal ServiceCheck curl for service with id '$service->id' as ServiceCheck: '$response'");
+        } catch (Exception $exception) {
+            LogService::error(LogFile::SERVICE_MULTITHREADING, "Could not parse response of internal ServiceCheck curl for service with id '$service->id' as ServiceCheck: '$response'", $exception);
             return FALSE;
         }
-        return $serviceCheck;
     }
 }
