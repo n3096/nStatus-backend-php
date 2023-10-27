@@ -3,6 +3,7 @@
 namespace service;
 
 use InvalidArgumentException;
+use model\configuration\LogFile;
 use model\DateTimeSerializable;
 use model\Service;
 use model\ServiceCheck;
@@ -13,15 +14,15 @@ class ServiceCheckService {
     private function __construct() {}
 
     static public function checkServices(): void {
-        $serviceCheckMap = ServiceCheckThreaderService::checkServicesMultithreaded(ConfigurationService::getServices());
+        LogService::info(LogFile::SERVICE_CHECK, "Started checking status of services");
+        $serviceCheckMap = ServiceCheckMultithreadingService::checkServicesMultithreaded(EntityService::getServices());
 
-        $fileHandler = fopen(__DIR__ . '/../api/index.json', "w");
-        fwrite($fileHandler, json_encode($serviceCheckMap));
-        fclose($fileHandler);
+        ApiService::updateServices($serviceCheckMap);
+        LogService::info(LogFile::SERVICE_CHECK, "Finished checking status of services");
     }
 
     static public function checkService(?string $data, ?string $salt): ServiceCheck|FALSE {
-        $service = ServiceCheckThreaderService::parseService($data, $salt);
+        $service = ServiceCheckMultithreadingService::parseService($data, $salt);
         if (!$service) return FALSE;
 
         $notes = [];
@@ -34,9 +35,8 @@ class ServiceCheckService {
         $resource = fsockopen($fullHostName, $service->port, $errorCode, $errMessage, $service->timeout);
         $latency = intval((microtime(TRUE) - $latencyStart) * 1000); // convert to milliseconds
 
-        if (!$resource) {
-            $status = Status::UNREACHABLE;
-        } else {
+        $status = Status::UNREACHABLE;
+        if ($resource) {
             $status = Status::REACHABLE;
             $response = self::getResponse($resource, $service, $status, $notes);
             fclose($resource);
@@ -55,7 +55,7 @@ class ServiceCheckService {
         if(empty($response))
             $response = (object)[];
 
-        return new ServiceCheck($service, $fullHostName, $dateTime, $latency, self::getIpv4($service), self::getIpv6($service), $forwardedHost, $status, $response, $notes);
+        return ServiceCheck::createByService($service, $fullHostName, $dateTime, $latency, self::getIpv4($service), self::getIpv6($service), $forwardedHost, $status, $response, $notes);
     }
 
     static private function getActualHostName(string $hostName, SocketProtocol $socketProtocol): string {
@@ -87,12 +87,9 @@ class ServiceCheckService {
         };
     }
 
-    static private function getResponseForHttpAndHttps($resource, Service $service, Status &$status, array &$notes): array
-    {
+    static private function getResponseForHttpAndHttps($resource, Service $service, Status &$status, array &$notes): array {
         if (!is_resource($resource))
             throw new InvalidArgumentException(sprintf('Argument must be a valid resource type. %s given.', gettype($resource)));
-
-        $result = [];
 
         $request = "GET / HTTP/1.1\r\n";
         $request .= "Host: $service->hostName\r\n";
@@ -109,6 +106,7 @@ class ServiceCheckService {
         preg_match('/HTTP\/1\.\d (\d{3})/', $response, $statusCodeMatches);
         $httpStatusCode = isset($statusCodeMatches[1]) ? (int)$statusCodeMatches[1] : null;
 
+        $result = [];
         if (!$httpStatusCode) {
             $notes[] = "Could not parse http status code";
             return $result;
