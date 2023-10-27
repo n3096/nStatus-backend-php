@@ -2,8 +2,8 @@
 
 namespace service;
 
+use helper\mapper\ConfigurationMapper;
 use model\configuration\LogFile;
-use model\mapper\ConfigurationMapper;
 use model\Service;
 
 class EntityService {
@@ -40,14 +40,25 @@ class EntityService {
         return $configurationFileLastChanged != self::$configurationFileLastChanged;
     }
 
-    static public function load(): void {
+    static private function load(): void {
         LogService::info(LogFile::CONFIGURATION, 'Load configuration');
 
         $configuration = FileService::parseFile(self::$CONFIGURATION_FILE, new ConfigurationMapper());
-        self::$servers = $configuration->servers;
-        self::$services = array_reduce( self::$servers, function ($carry, $server) {
+
+        self::$servers = self::removeDisabledServices($configuration->servers);
+        self::$services = self::flatServiceLists(self::$servers);
+    }
+
+    static private function removeDisabledServices(array $servers): array {
+        return array_map(function ($server) {
+            $server->services = array_filter($server->services, function ($service) { return $service->enabled === TRUE; });
+            return $server;
+        }, $servers);
+    }
+
+    static private function flatServiceLists(array $servers): array {
+        return array_reduce($servers, function ($carry, $server) {
             return array_merge($carry, $server->services);
         }, []);
-        var_dump(self::$services);
     }
 }

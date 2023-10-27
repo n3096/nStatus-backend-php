@@ -1,6 +1,6 @@
 <?php
 
-namespace model\mapper;
+namespace helper\mapper;
 
 use Exception;
 use InvalidArgumentException;
@@ -20,8 +20,8 @@ class ServerMapper {
         foreach ($object->services as $key => $service) {
             try {
                 $services[] = call_user_func(ServiceMapper::map(), $service);
-            } catch (Exception) {
-                LogService::error(LogFile::MAPPING, "Could not map to Service in server with id '$object->id' on array key '$key'");
+            } catch (Exception $exception) {
+                LogService::error(LogFile::MAPPING, "Could not map to Service in server with id '$object->id' on array key '$key'", $exception);
             }
         }
         return new Server($object->id, $object->name, $services);
