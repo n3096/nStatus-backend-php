@@ -17,43 +17,49 @@ class ApiService {
     private function __construct() {}
 
     static public function updateServers(array $servers): void {
-        $path = self::$BASE_PATH . 'servers/' . self::$DEFAULT_FILE_NAME;
-        FileService::set($path, array_map(ServerDtoMapper::map(), $servers));
+        try {
+            $path = self::$BASE_PATH . 'servers/' . self::$DEFAULT_FILE_NAME;
+            FileService::set($path, array_map(ServerDtoMapper::map(), $servers));
+        } catch (Exception $exception) {
+            LogService::error(LogFile::SERVICE_CHECK, "Error when updating servers api file", $exception);
+        }
     }
 
     static public function updateServices(array $servicesMap): void {
         $path = self::$BASE_PATH . 'services/';
-        self::updateServicesEndpoint($path, array_keys($servicesMap));
+        $serviceDtos = [];
         foreach ($servicesMap as $serviceId => $serviceCheck) {
-            self::updateServiceEndpoints(EntityService::getService($serviceId), $serviceCheck);
+            if ($serviceDto = self::updateService($path, EntityService::getService($serviceId), $serviceCheck))
+                $serviceDtos[] = $serviceDto;
         }
+        self::updateServicesEndpoint($path, $serviceDtos);
     }
 
-    static private function updateServicesEndpoint(string $path, array $servicesIds): void {
+    static private function updateServicesEndpoint(string $path, array $serviceDtos): void {
         try {
-            $path .= self::$DEFAULT_FILE_NAME;
-            FileService::set($path, $servicesIds);
+            FileService::set($path . self::$DEFAULT_FILE_NAME, $serviceDtos);
         } catch (Exception $exception) {
-            LogService::error(LogFile::SERVICE_CHECK, "Error when updating API-file '$path'", $exception);
+            LogService::error(LogFile::SERVICE_CHECK, "Error when updating services api file", $exception);
         }
     }
 
-    static private function updateServiceEndpoints(Service $service, ServiceCheck $serviceCheck): void {
+    static private function updateService(string $path, Service $service, ServiceCheck $serviceCheck): ServiceDto|FALSE {
         try {
-            $path = self::$BASE_PATH . "$service->id/";
-            $serviceChecks = self::updateServiceChecks($path, $serviceCheck);
-            self::updateService($path, $service, $serviceChecks);
+            $path .= "$service->id/";
+            $serviceCheckHistory = self::updateServiceHistory($path, $serviceCheck);
+            return self::updateServiceEndpoint($path, $service, $serviceCheckHistory);
         } catch (Exception $exception) {
             LogService::error(LogFile::SERVICE_CHECK, "Error when updating service '$service->id'", $exception);
+            return FALSE;
         }
     }
 
-    static private function updateServiceChecks(string $path, ServiceCheck $serviceCheck): array {
-        $path .= 'service-check-history/full/' . self::$DEFAULT_FILE_NAME;
-        $serviceChecks = FileService::exists($path) ? FileService::parseFile($path, ArrayMapper::map(ServiceCheckMapper::map())) : [];
-        if (sizeof($serviceChecks) == 0 || self::hasStatusChanged($serviceChecks, $serviceCheck)) {
+    static private function updateServiceHistory(string $path, ServiceCheck $serviceCheck): array {
+        $filePath = $path . "service-check-history/full/" . self::$DEFAULT_FILE_NAME;
+        $serviceChecks = FileService::exists($filePath) ? FileService::parseFile($filePath, ArrayMapper::map(ServiceCheckMapper::map())) : [];
+        if (self::hasStatusChanged($serviceChecks, $serviceCheck)) {
             $serviceChecks[] = $serviceCheck;
-            FileService::set($path, $serviceChecks);
+            FileService::set($filePath, $serviceChecks);
         }
         return $serviceChecks;
     }
@@ -62,13 +68,14 @@ class ApiService {
         if (sizeof($serviceChecks) == 0)
             return TRUE;
         usort($serviceChecks, function ($a, $b) {
-            return strtotime($b->timestamp) - strtotime($a->timestamp);
+            return $b->timestamp->getTimestamp() - $a->timestamp->getTimestamp();
         });
         return $serviceChecks[0]->status === $serviceCheck->status;
     }
 
-    static private function updateService(string $path, Service $service, array $serviceChecks): void {
-        $path .= self::$DEFAULT_FILE_NAME;
-        FileService::set($path, json_encode(new ServiceDto($service, $serviceChecks)));
+    static private function updateServiceEndpoint(string $path, Service $service, array $serviceChecks): ServiceDto {
+        $serviceDto = new ServiceDto($service, $serviceChecks);
+        FileService::set($path . self::$DEFAULT_FILE_NAME, json_encode($serviceDto));
+        return $serviceDto;
     }
 }

@@ -11,13 +11,13 @@ class ServiceDto {
     public string $name;
     public string $icon;
     public DateTimeSerializable $latestUpdate;
-    public array $serviceCheckDtoHistory = [];
+    public array $serviceCheckHistory = [];
 
-    public function __construct(Service $service, array $serviceChecks) {
+    public function __construct(Service $service, array $serviceCheckHistory) {
         $this->id = UUID4::validate($service->id);
         $this->name = $service->name;
         $this->icon = $service->icon;
         $this->latestUpdate = new DateTimeSerializable();
-        $this->serviceCheckDtoHistory = array_map(function($serviceCheck) { return new ServiceCheckDto($serviceCheck); }, $serviceChecks);
+        $this->serviceCheckHistory = array_map(function($serviceCheck) { return new ServiceCheckDto($serviceCheck); }, $serviceCheckHistory);
     }
 }

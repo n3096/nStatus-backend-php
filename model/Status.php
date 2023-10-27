@@ -11,12 +11,11 @@ enum Status: string implements JsonSerializable {
     case WARNING = "WARNING";
     case UNREACHABLE = "UNREACHABLE";
 
-    #[ReturnTypeWillChange] public function jsonSerialize(): string
-    {
+    #[ReturnTypeWillChange] public function jsonSerialize(): string {
         return $this->value;
     }
 
-    public static function parse(string $status): Status {
+    public static function parse(?string $status): Status {
         return match ($status) {
             self::REACHABLE->value => self::REACHABLE,
             self::WARNING->value => self::WARNING,
