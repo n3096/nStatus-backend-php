@@ -2,10 +2,12 @@
 
 namespace service;
 
+use DateTime;
 use Exception;
 use model\configuration\LogFile;
 
 class LogService {
+    static private string $DATE_FORMAT = 'Y-m-d H:i:s';
     private function __construct(){}
 
     static public function info(LogFile $logFile, string $message): void {
@@ -17,17 +19,17 @@ class LogService {
     }
 
     static public function error(LogFile $logFile, string $message, ?Exception $exception = NULL): void {
-        if ($exception)
-            $message .= ": {$exception->getTraceAsString()}";
-        self::addLine($logFile, $message, "ERROR");
+        $additionalLine = $exception ? "#MESSAGE: {$exception->getMessage()}\n{$exception->getTraceAsString()}" : "";
+        self::addLine($logFile, $message, "ERROR", $additionalLine);
     }
 
-    static private function addLine(LogFile $logFile, string $message, string $prefix): void {
+    static private function addLine(LogFile $logFile, string $message, string $prefix, string $additionalLine = ""): void {
         $logFile = $logFile->getLogFilePath();
-        $date = gmdate('Y-d-M H:i:s');
+        $date = (new DateTime())->format(self::$DATE_FORMAT);
         $functionCallPoint = self::getFunctionCallOrder();
 
-        FileService::append($logFile, "$date [$prefix] $message ($functionCallPoint)");
+        $suffix = !empty($additionalLine) ? "\n$additionalLine" : "";
+        FileService::append($logFile, "$date [$prefix] $message ($functionCallPoint)$suffix");
     }
 
     static private function getFunctionCallOrder(): string {

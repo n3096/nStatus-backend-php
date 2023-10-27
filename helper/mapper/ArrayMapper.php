@@ -1,6 +1,6 @@
 <?php
 
-namespace model\mapper;
+namespace helper\mapper;
 
 use Exception;
 use model\configuration\LogFile;

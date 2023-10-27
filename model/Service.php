@@ -2,6 +2,8 @@
 
 namespace model;
 
+use helper\UUID4;
+
 class Service {
     public string $id;
     public string $name;
@@ -13,7 +15,7 @@ class Service {
     public int $timeout;
 
     public function __construct(?string $id, string $name, string $hostName, SocketProtocol $socketProtocol, int $port, string $icon, bool $enabled = true, int $timeout = 10) {
-        $this->id = $id ?: uniqid();
+        $this->id = UUID4::validate($id) ?: UUID4::generate();
         $this->name = $name;
         $this->hostName = $hostName;
         $this->socketProtocol = $socketProtocol;

@@ -17,6 +17,7 @@ class ServiceCheckService {
         LogService::info(LogFile::SERVICE_CHECK, "Started checking status of services");
         $serviceCheckMap = ServiceCheckMultithreadingService::checkServicesMultithreaded(EntityService::getServices());
 
+        ApiService::updateServers(EntityService::getServers());
         ApiService::updateServices($serviceCheckMap);
         LogService::info(LogFile::SERVICE_CHECK, "Finished checking status of services");
     }

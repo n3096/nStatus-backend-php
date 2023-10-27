@@ -31,12 +31,12 @@ class FileService {
         return file_exists($filePath);
     }
 
-    static public function append(string $filePath, mixed $content): void {
+    static public function append(string $filePath, string $content): void {
         self::write($filePath, "a", "$content\n");
     }
 
     static public function set(string $filePath, mixed $content): void {
-        self::write($filePath, "w", "$content");
+        self::write($filePath, "w", $content);
     }
 
     static public function clear(string $filePath): void {

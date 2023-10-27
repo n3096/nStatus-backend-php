@@ -2,6 +2,7 @@
 
 namespace model\dto;
 
+use helper\UUID4;
 use model\DateTimeSerializable;
 use model\Service;
 
@@ -13,7 +14,7 @@ class ServiceDto {
     public array $serviceCheckDtoHistory = [];
 
     public function __construct(Service $service, array $serviceChecks) {
-        $this->id = $service->id;
+        $this->id = UUID4::validate($service->id);
         $this->name = $service->name;
         $this->icon = $service->icon;
         $this->latestUpdate = new DateTimeSerializable();

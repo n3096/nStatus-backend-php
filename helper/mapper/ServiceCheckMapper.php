@@ -1,6 +1,6 @@
 <?php
 
-namespace model\mapper;
+namespace helper\mapper;
 
 use model\DateTimeSerializable;
 use model\ServiceCheck;
