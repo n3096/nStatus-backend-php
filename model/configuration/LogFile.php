@@ -8,8 +8,12 @@ enum LogFile: string {
     case FILE_ACCESS = "files-access";
     case MAPPING = "mapping";
     case CONFIGURATION = "configuration";
+    case STATISTICS = "statistics";
 
     public function getLogFilePath(): string {
-        return __DIR__ . "/../../logs/$this->value.log";
+        return self::getLogBasePath() . "$this->value.log";
+    }
+    static public function getLogBasePath(): string {
+        return __DIR__ . '/../../logs/';
     }
 }

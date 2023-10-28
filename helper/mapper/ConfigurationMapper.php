@@ -24,7 +24,7 @@ class ConfigurationMapper {
                 LogService::error(LogFile::MAPPING, "Could not map to Server on array key '$key'", $throwable);
             }
         }
-        return new Configuration($object->isDebug ?? FALSE, $servers ?? [], (array)$object->basePaths ?? []);
+        return new Configuration($object->isDebug ?? FALSE, $object->updateInterval ?? 3600, $servers ?? [], (array)$object->basePaths ?? []);
     }
 
     static public function map(): callable {

@@ -1,5 +1,6 @@
 DirectoryIndex index.json
 
+# Access
 <FilesMatch ".+\.php.*$">
     Require all denied
 </FilesMatch>
@@ -7,6 +8,18 @@ DirectoryIndex index.json
     Require all granted
 </FilesMatch>
 
+# Error
+ErrorDocument 400 /api/apiError.php?code=400
+ErrorDocument 401 /api/apiError.php?code=401
+ErrorDocument 403 /api/apiError.php?code=403
+ErrorDocument 404 /api/apiError.php?code=404
+ErrorDocument 405 /api/apiError.php?code=405
+ErrorDocument 429 /api/apiError.php?code=429
+ErrorDocument 500 /api/apiError.php?code=500
+ErrorDocument 502 /api/apiError.php?code=502
+ErrorDocument 503 /api/apiError.php?code=503
+
+# Rewrite
 RewriteEngine On
 RewriteCond %{REQUEST_URI} ^.*/services/serviceCheck$
 RewriteRule ^ ./getServiceChecks.php [L]

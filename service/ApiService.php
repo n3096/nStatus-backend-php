@@ -6,15 +6,58 @@ use helper\mapper\ArrayMapper;
 use helper\mapper\ServerDtoMapper;
 use helper\mapper\ServiceCheckMapper;
 use model\configuration\LogFile;
+use model\DateTimeSerializable;
+use model\dto\ApiInformationDto;
 use model\dto\ServiceDto;
 use model\Service;
 use model\ServiceCheck;
+use model\statistics\ServicesCheckStatistics;
 use Throwable;
 
 class ApiService {
     static private string $BASE_PATH = __DIR__ . "/../api/";
     static private string $DEFAULT_FILE_NAME = 'index.json';
     private function __construct() {}
+    static public function getBasePath(): string {
+        return self::$BASE_PATH;
+    }
+
+    static public function updateStatistics(ServicesCheckStatistics $servicesCheckStatistics): void {
+        $path = self::$BASE_PATH . 'statistics/';
+        self::updateServicesCheckStatisticsHistory($path, $servicesCheckStatistics);
+        self::updateServicesCheckStatisticsRunTimestamps($path, $servicesCheckStatistics->timestamp);
+    }
+
+    static private function updateServicesCheckStatisticsHistory(string $path, ServicesCheckStatistics $checksStatistics): void {
+        try {
+            $path .= 'servicesCheckHistory/';
+            FileService::append($path . 'index.csv', $checksStatistics);
+        } catch (Throwable $throwable) {
+            LogService::error(LogFile::SERVICE_CHECK, "Error when updating servicesCheckHistory statistics file ", $throwable);
+        }
+    }
+
+    static private function updateServicesCheckStatisticsRunTimestamps(string $path, DateTimeSerializable $timestamp): void {
+        try {
+            $filePath = $path . "runs/timestamps/" . self::$DEFAULT_FILE_NAME;
+            $timestamps = FileService::exists($filePath) ? FileService::parseFile($filePath, ArrayMapper::map(new DateTimeSerializable())) : [];
+            $timestamps[] = $timestamp;
+            FileService::set($filePath, $timestamps);
+        } catch (Throwable $throwable) {
+            LogService::error(LogFile::SERVICE_CHECK, "Error when updating timestamps for runs statistics file", $throwable);
+        }
+    }
+
+    static public function updateApiInformation(ServicesCheckStatistics $checksStatistics, array $services): void {
+        try {
+            $updateInterval = ConfigurationService::get('updateInterval', self::class);
+            $maxTimeout = max(array_map(function ($service) {return $service->timeout;}, $services));
+            $apiInformation = new ApiInformationDto($checksStatistics->logSize, $checksStatistics->apiSize, $maxTimeout, $updateInterval);
+            FileService::set(self::$BASE_PATH . self::$DEFAULT_FILE_NAME, $apiInformation);
+        } catch (Throwable $throwable) {
+            LogService::error(LogFile::SERVICE_CHECK, "Error when updating api base information file ", $throwable);
+        }
+    }
 
     static public function updateServers(array $servers): void {
         try {
@@ -28,8 +71,8 @@ class ApiService {
     static public function updateServices(array $servicesMap): void {
         $path = self::$BASE_PATH . 'services/';
         $serviceDtos = [];
-        foreach ($servicesMap as $serviceId => $serviceCheck) {
-            if ($serviceDto = self::updateService($path, EntityService::getService($serviceId), $serviceCheck))
+        foreach ($servicesMap as $serviceMap) {
+            if ($serviceDto = self::updateService($path, $serviceMap['service'], $serviceMap['serviceCheck']))
                 $serviceDtos[] = $serviceDto;
         }
         self::updateServicesEndpoint($path, $serviceDtos);

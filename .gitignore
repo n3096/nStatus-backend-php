@@ -20,7 +20,7 @@ coverage
 *.sw?
 
 # generated rest-jsons
-api/**/*.json
+api
 
 # configuration
 configuration.json
