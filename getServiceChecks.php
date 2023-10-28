@@ -12,6 +12,6 @@ use service\ServiceCheckService;
 
 try {
     ServiceCheckService::checkServices();
-} catch (Exception $exception) {
-    LogService::error(LogFile::SERVICE_CHECK, "Error when checking services", $exception);
+} catch (Throwable $throwable) {
+    LogService::error(LogFile::SERVICE_CHECK, "Error when checking services", $throwable);
 }

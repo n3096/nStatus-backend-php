@@ -2,12 +2,12 @@
 
 namespace helper\mapper;
 
-use Exception;
 use InvalidArgumentException;
 use model\configuration\Configuration;
 use model\configuration\LogFile;
 use service\LogService;
 use stdClass;
+use Throwable;
 
 class ConfigurationMapper {
     public function __invoke(stdClass $object): Configuration {
@@ -20,11 +20,11 @@ class ConfigurationMapper {
         foreach ($object->servers as $key => $server) {
             try {
                 $servers[] = call_user_func(new ServerMapper(), $server);
-            } catch (Exception $exception) {
-                LogService::error(LogFile::MAPPING, "Could not map to Server on array key '$key'", $exception);
+            } catch (Throwable $throwable) {
+                LogService::error(LogFile::MAPPING, "Could not map to Server on array key '$key'", $throwable);
             }
         }
-        return new Configuration($servers, (array)$object->basePaths);
+        return new Configuration($object->isDebug ?? FALSE, $servers ?? [], (array)$object->basePaths ?? []);
     }
 
     static public function map(): callable {

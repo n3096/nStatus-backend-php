@@ -4,7 +4,6 @@ namespace service;
 
 use CurlHandle;
 use CurlMultiHandle;
-use Exception;
 use model\configuration\LogFile;
 use model\DateTimeSerializable;
 use model\security\nSecure;
@@ -12,6 +11,7 @@ use model\Service;
 use model\ServiceCheck;
 use model\SocketProtocol;
 use model\Status;
+use Throwable;
 
 class ServiceCheckMultithreadingService {
     static private string $SALT_LIST_FILE_PATH = __DIR__ . '/../tmp/getTemporarySalts.php';
@@ -27,9 +27,7 @@ class ServiceCheckMultithreadingService {
         try {
             $serviceMap = nSecure::decrypt($data, $hash, self::getLocalFileSaltList($hash));
             return new Service($serviceMap['id'], $serviceMap['name'], $serviceMap['hostName'], SocketProtocol::parse($serviceMap['socketProtocol']), $serviceMap['port'], $serviceMap['icon'], $serviceMap['enabled'], $serviceMap['timeout']);
-        } catch (Exception) {
-            return FALSE;
-        }
+        } catch (Throwable) { return FALSE; }
     }
 
     public static function checkServicesMultithreaded(array $services): array {
@@ -74,9 +72,7 @@ class ServiceCheckMultithreadingService {
         try {
             require_once self::$SALT_LIST_FILE_PATH;
             return nSecure::decrypt(getSalt(), $hash, [$hash]);
-        } catch (Exception) {
-            return FALSE;
-        }
+        } catch (Throwable) { return FALSE; }
     }
 
     static private function getServiceCurlHandle(Service $service, string $hash, array $salts, string $hostUrl, string $headerDate): CurlHandle|FALSE {
@@ -139,8 +135,8 @@ class ServiceCheckMultithreadingService {
                 Status::parse($serviceCheckMap['status']),
                 $serviceCheckMap['response'],
                 $serviceCheckMap['notes']);
-        } catch (Exception $exception) {
-            LogService::error(LogFile::SERVICE_MULTITHREADING, "Could not parse response of internal ServiceCheck curl for service with id '$service->id' as ServiceCheck: '$response'", $exception);
+        } catch (Throwable $throwable) {
+            LogService::error(LogFile::SERVICE_MULTITHREADING, "Could not parse response of internal ServiceCheck curl for service with id '$service->id' as ServiceCheck: '$response'", $throwable);
             return FALSE;
         }
     }

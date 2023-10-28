@@ -3,7 +3,6 @@
 namespace service;
 
 use DateTime;
-use Exception;
 use model\configuration\LogFile;
 
 class LogService {
@@ -14,12 +13,21 @@ class LogService {
         self::addLine($logFile, $message, "INFO");
     }
 
+    static public function debug(LogFile $logFile, string $message): void {
+        if (self::isDebug())
+            self::addLine($logFile, $message, "DEBUG");
+    }
+
+    static private function isDebug(): bool {
+        return ConfigurationService::get('isDebug', self::class);
+    }
+
     static public function warning(LogFile $logFile, string $message): void {
         self::addLine($logFile, $message, "WARN");
     }
 
-    static public function error(LogFile $logFile, string $message, ?Exception $exception = NULL): void {
-        $additionalLine = $exception ? "#MESSAGE: {$exception->getMessage()}\n{$exception->getTraceAsString()}" : "";
+    static public function error(LogFile $logFile, string $message, ?\Throwable $throwable = NULL): void {
+        $additionalLine = $throwable ? "#MESSAGE: {$throwable->getMessage()}\n{$throwable->getTraceAsString()}" : "";
         self::addLine($logFile, $message, "ERROR", $additionalLine);
     }
 

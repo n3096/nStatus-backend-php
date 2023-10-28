@@ -2,8 +2,8 @@
 
 namespace helper;
 
-use Exception;
 use InvalidArgumentException;
+use Throwable;
 
 class UUID4 {
     private function __construct () {}
@@ -18,7 +18,7 @@ class UUID4 {
 
             // Format the UUID
             return self::validate(vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4)));
-        } catch (Exception) {return FALSE;}
+        } catch (Throwable) {return FALSE;}
     }
 
     static public function validate(string $string): string {

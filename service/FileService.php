@@ -2,10 +2,10 @@
 
 namespace service;
 
-use Exception;
 use InvalidArgumentException;
 use model\configuration\LogFile;
 use RuntimeException;
+use Throwable;
 
 class FileService {
     static private int $DEFAULT_FILE_PERMISSION = 0777;
@@ -16,7 +16,7 @@ class FileService {
         if ($mapFunction) {
             try {
                 return call_user_func($mapFunction, $map);
-            } catch (Exception) {
+            } catch (Throwable) {
                 LogService::error(LogFile::FILE_ACCESS, "Could not map to '$mapFunction' from file '$filePath' with associative '$associative'");
             }
         }
