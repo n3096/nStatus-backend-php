@@ -20,4 +20,8 @@ class DateTimeSerializable extends DateTime implements JsonSerializable {
     #[ReturnTypeWillChange] public function jsonSerialize() {
         return $this->format("c");
     }
+
+    public function __invoke(string $string): DateTimeSerializable {
+        return DateTimeSerializable::parse($string);
+    }
 }

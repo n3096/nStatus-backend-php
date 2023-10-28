@@ -2,14 +2,35 @@
 
 namespace service;
 
+use FilesystemIterator;
 use InvalidArgumentException;
 use model\configuration\LogFile;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use RuntimeException;
 use Throwable;
 
 class FileService {
     static private int $DEFAULT_FILE_PERMISSION = 0777;
     private function __construct() {}
+
+    static public function getSize(string $path): int|FALSE {
+        if (is_file($path))
+            return filesize($path);
+        if (!is_dir($path))
+            return FALSE;
+
+        $totalSize = 0;
+        $files = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::SELF_FIRST);
+
+        foreach ($files as $file) {
+            if (is_file($file))
+                $totalSize += filesize($file);
+        }
+        return $totalSize;
+    }
 
     static public function parseFile(string $filePath, callable|FALSE $mapFunction = FALSE): mixed {
         $map = json_decode(self::read($filePath));
@@ -31,7 +52,9 @@ class FileService {
         return file_exists($filePath);
     }
 
-    static public function append(string $filePath, string $content): void {
+    static public function append(string $filePath, mixed $content): void {
+        if (!is_string($content))
+            $content = json_encode($content);
         self::write($filePath, "a", "$content\n");
     }
 

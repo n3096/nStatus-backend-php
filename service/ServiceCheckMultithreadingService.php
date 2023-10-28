@@ -55,7 +55,7 @@ class ServiceCheckMultithreadingService {
         foreach($serviceCurlMap as $serviceCurlEntry){
             curl_multi_remove_handle($multiCurlHandler, $serviceCurlEntry['curl']);
             if ($serviceCheck = self::parseCurlResponse($serviceCurlEntry['service'], $serviceCurlEntry['curl'], $headerDate))
-                $serviceCheckMap[$serviceCurlEntry['service']->id] = $serviceCheck;
+                $serviceCheckMap[$serviceCurlEntry['service']->id] = ['service' => $serviceCurlEntry['service'], 'serviceCheck' => $serviceCheck];
         }
         curl_multi_close($multiCurlHandler);
         FileService::clear(self::$SALT_LIST_FILE_PATH);
