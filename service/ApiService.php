@@ -2,7 +2,6 @@
 
 namespace service;
 
-use Exception;
 use helper\mapper\ArrayMapper;
 use helper\mapper\ServerDtoMapper;
 use helper\mapper\ServiceCheckMapper;
@@ -10,6 +9,7 @@ use model\configuration\LogFile;
 use model\dto\ServiceDto;
 use model\Service;
 use model\ServiceCheck;
+use Throwable;
 
 class ApiService {
     static private string $BASE_PATH = __DIR__ . "/../api/";
@@ -20,8 +20,8 @@ class ApiService {
         try {
             $path = self::$BASE_PATH . 'servers/' . self::$DEFAULT_FILE_NAME;
             FileService::set($path, array_map(ServerDtoMapper::map(), $servers));
-        } catch (Exception $exception) {
-            LogService::error(LogFile::SERVICE_CHECK, "Error when updating servers api file", $exception);
+        } catch (Throwable $throwable) {
+            LogService::error(LogFile::SERVICE_CHECK, "Error when updating servers api file", $throwable);
         }
     }
 
@@ -38,8 +38,8 @@ class ApiService {
     static private function updateServicesEndpoint(string $path, array $serviceDtos): void {
         try {
             FileService::set($path . self::$DEFAULT_FILE_NAME, $serviceDtos);
-        } catch (Exception $exception) {
-            LogService::error(LogFile::SERVICE_CHECK, "Error when updating services api file", $exception);
+        } catch (Throwable $throwable) {
+            LogService::error(LogFile::SERVICE_CHECK, "Error when updating services api file", $throwable);
         }
     }
 
@@ -48,8 +48,8 @@ class ApiService {
             $path .= "$service->id/";
             $serviceCheckHistory = self::updateServiceHistory($path, $serviceCheck);
             return self::updateServiceEndpoint($path, $service, $serviceCheckHistory);
-        } catch (Exception $exception) {
-            LogService::error(LogFile::SERVICE_CHECK, "Error when updating service '$service->id'", $exception);
+        } catch (Throwable $throwable) {
+            LogService::error(LogFile::SERVICE_CHECK, "Error when updating service '$service->id'", $throwable);
             return FALSE;
         }
     }
@@ -70,7 +70,7 @@ class ApiService {
         usort($serviceChecks, function ($a, $b) {
             return $b->timestamp->getTimestamp() - $a->timestamp->getTimestamp();
         });
-        return $serviceChecks[0]->status === $serviceCheck->status;
+        return $serviceChecks[0]->status !== $serviceCheck->status;
     }
 
     static private function updateServiceEndpoint(string $path, Service $service, array $serviceChecks): ServiceDto {

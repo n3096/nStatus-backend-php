@@ -20,8 +20,8 @@ if ($_SERVER['HTTP_X_FORWARDED_FOR'] != $_SERVER['SERVER_ADDR']) {
 try {
     $response = ServiceCheckService::checkService($_GET['id'], $_SERVER['HTTP_DATE']);
     if (!$response) throw new Exception();
-} catch (Exception $exception) {
-    LogService::error(LogFile::SERVICE_MULTITHREADING, "Error when checking service", $exception);
+} catch (Throwable $throwable) {
+    LogService::error(LogFile::SERVICE_MULTITHREADING, "Error when checking service", $throwable);
     exit('{"status": "unknown"}');
 }
 

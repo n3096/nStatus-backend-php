@@ -2,9 +2,9 @@
 
 namespace helper\mapper;
 
-use Exception;
 use model\configuration\LogFile;
 use service\LogService;
+use Throwable;
 
 class ArrayMapper {
     public mixed $mapFunction;
@@ -18,8 +18,8 @@ class ArrayMapper {
         foreach ($array as $key => $item) {
             try {
                 $result[] = call_user_func($this->mapFunction, $item);
-            } catch (Exception $exception) {
-                LogService::error(LogFile::MAPPING, "Could not map to item on key '$key'", $exception);
+            } catch (Throwable $throwable) {
+                LogService::error(LogFile::MAPPING, "Could not map to item on key '$key'", $throwable);
             }
         }
         return $result;
