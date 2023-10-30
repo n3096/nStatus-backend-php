@@ -12,6 +12,7 @@ use model\dto\ServiceDto;
 use model\Service;
 use model\ServiceCheck;
 use model\statistics\ServicesCheckStatistics;
+use model\Status;
 use Throwable;
 
 class ApiService {
@@ -90,7 +91,7 @@ class ApiService {
         try {
             $path .= "$service->id/";
             $serviceCheckHistory = self::updateServiceHistory($path, $serviceCheck);
-            return self::updateServiceEndpoint($path, $service, $serviceCheckHistory);
+            return self::updateServiceEndpoint($path, $service, $serviceCheck->status, $serviceCheckHistory);
         } catch (Throwable $throwable) {
             LogService::error(LogFile::SERVICE_CHECK, "Error when updating service '$service->id'", $throwable);
             return FALSE;
@@ -116,8 +117,8 @@ class ApiService {
         return $serviceChecks[0]->status !== $serviceCheck->status;
     }
 
-    static private function updateServiceEndpoint(string $path, Service $service, array $serviceChecks): ServiceDto {
-        $serviceDto = new ServiceDto($service, $serviceChecks);
+    static private function updateServiceEndpoint(string $path, Service $service, Status $status, array $serviceChecks): ServiceDto {
+        $serviceDto = new ServiceDto($service, $status, $serviceChecks);
         FileService::set($path . self::$DEFAULT_FILE_NAME, json_encode($serviceDto));
         return $serviceDto;
     }
