@@ -53,7 +53,7 @@ class ApiService {
         try {
             $updateInterval = ConfigurationService::get('updateInterval', self::class);
             $maxTimeout = max(array_map(function ($service) {return $service->timeout;}, $services));
-            $apiInformation = new ApiInformationDto($checksStatistics->logSize, $checksStatistics->apiSize, $maxTimeout, $updateInterval);
+            $apiInformation = new ApiInformationDto($checksStatistics->logSize, $checksStatistics->apiSize, $maxTimeout, $updateInterval, $checksStatistics->runTime);
             FileService::set(self::$BASE_PATH . self::$DEFAULT_FILE_NAME, $apiInformation);
         } catch (Throwable $throwable) {
             LogService::error(LogFile::SERVICE_CHECK, "Error when updating api base information file ", $throwable);
