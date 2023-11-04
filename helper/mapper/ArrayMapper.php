@@ -2,7 +2,6 @@
 
 namespace helper\mapper;
 
-use model\configuration\LogFile;
 use service\LogService;
 use Throwable;
 
@@ -19,13 +18,13 @@ class ArrayMapper {
             try {
                 $result[] = call_user_func($this->mapFunction, $item);
             } catch (Throwable $throwable) {
-                LogService::error(LogFile::MAPPING, "Could not map to item on key '$key'", $throwable);
+                LogService::error("Could not map to item on key '$key'", $throwable);
             }
         }
         return $result;
     }
 
-    static public function map(callable $mapFunction): callable {
+    public static function map(callable $mapFunction): callable {
         return new ArrayMapper($mapFunction);
     }
 }

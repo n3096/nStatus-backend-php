@@ -31,7 +31,7 @@ class ServiceCheck {
         $this->notes = $notes;
     }
 
-    static public function createByService(Service $service, string $fullHostName, DateTimeSerializable $timestamp, int $latency, ?string $ipv4, ?string $ipv6, ?string $forwardedHost, Status $status, array|object $response, array $notes): ServiceCheck {
+    public static function createByService(Service $service, string $fullHostName, DateTimeSerializable $timestamp, int $latency, ?string $ipv4, ?string $ipv6, ?string $forwardedHost, Status $status, array|object $response, array $notes): ServiceCheck {
         return new ServiceCheck($service->hostName, $service->port, $service->socketProtocol, $fullHostName, $timestamp, $latency, $ipv4, $ipv6, $forwardedHost, $status, $response, $notes);
     }
 }

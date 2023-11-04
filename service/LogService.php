@@ -3,36 +3,45 @@
 namespace service;
 
 use DateTime;
-use model\configuration\LogFile;
+use Throwable;
 
 class LogService {
-    static private string $DATE_FORMAT = 'Y-m-d H:i:s';
+    private static string $LOG_BASE_PATH = __DIR__ . '/../logs/';
+    private static string $DATE_FORMAT = 'Y-m-d H:i:s';
+    private static bool|null $IS_DEBUG_MODE = null;
     private function __construct(){}
 
-    static public function info(LogFile $logFile, string $message): void {
-        self::addLine($logFile, $message, "INFO");
+    public static function getLogBasePath(): string {
+        return self::$LOG_BASE_PATH;
     }
 
-    static public function debug(LogFile $logFile, string $message): void {
-        if (self::isDebug())
-            self::addLine($logFile, $message, "DEBUG");
+    public static function info(mixed $message): void {
+        self::addLine($message, "INFO");
     }
 
-    static private function isDebug(): bool {
-        return ConfigurationService::get('isDebug', self::class);
+    public static function debug(mixed $message): void {
+        if (self::isDebugMode())
+            self::addLine($message, "DEBUG");
     }
 
-    static public function warning(LogFile $logFile, string $message): void {
-        self::addLine($logFile, $message, "WARN");
+    private static function isDebugMode(): bool {
+        return self::$IS_DEBUG_MODE ?? self::$IS_DEBUG_MODE = ConfigurationService::get('isDebug', self::class);
     }
 
-    static public function error(LogFile $logFile, string $message, ?\Throwable $throwable = NULL): void {
+    public static function warning(string $message): void {
+        self::addLine($message, "WARN");
+    }
+
+    public static function error(mixed $message, ?Throwable $throwable = NULL): void {
         $additionalLine = $throwable ? "#MESSAGE: {$throwable->getMessage()}\n{$throwable->getTraceAsString()}" : "";
-        self::addLine($logFile, $message, "ERROR", $additionalLine);
+        self::addLine($message, "ERROR", $additionalLine);
     }
 
-    static private function addLine(LogFile $logFile, string $message, string $prefix, string $additionalLine = ""): void {
-        $logFile = $logFile->getLogFilePath();
+    private static function addLine(mixed $message, string $prefix, string $additionalLine = ""): void {
+        if (!is_string($message))
+            $message = json_encode($message);
+
+        $logFile = self::$LOG_BASE_PATH . date("Y-m-d") . '.log';
         $date = (new DateTime())->format(self::$DATE_FORMAT);
         $functionCallPoint = self::getFunctionCallOrder();
 
@@ -40,7 +49,7 @@ class LogService {
         FileService::append($logFile, "$date [$prefix] $message ($functionCallPoint)$suffix");
     }
 
-    static private function getFunctionCallOrder(): string {
+    private static function getFunctionCallOrder(): string {
         $functionCalls = [];
         foreach (debug_backtrace() as $debugStep) {
             if (isset($debugStep['file']) && $debugStep['file'] !== __FILE__)

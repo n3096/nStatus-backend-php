@@ -4,17 +4,16 @@ namespace service;
 
 use FilesystemIterator;
 use InvalidArgumentException;
-use model\configuration\LogFile;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use RuntimeException;
 use Throwable;
 
 class FileService {
-    static private int $DEFAULT_FILE_PERMISSION = 0777;
+    private static int $DEFAULT_FILE_PERMISSION = 0777;
     private function __construct() {}
 
-    static public function getSize(string $path): int|FALSE {
+    public static function getSize(string $path): int|FALSE {
         if (is_file($path))
             return filesize($path);
         if (!is_dir($path))
@@ -32,46 +31,46 @@ class FileService {
         return $totalSize;
     }
 
-    static public function parseFile(string $filePath, callable|FALSE $mapFunction = FALSE): mixed {
+    public static function parseFile(string $filePath, callable|FALSE $mapFunction = FALSE): mixed {
         $map = json_decode(self::read($filePath));
         if ($mapFunction) {
             try {
                 return call_user_func($mapFunction, $map);
             } catch (Throwable $exception) {
-                LogService::error(LogFile::FILE_ACCESS, "Could not parse from file '$filePath'", $exception);
+                LogService::error("Could not parse from file '$filePath'", $exception);
                 return FALSE;
             }
         }
         return $map;
     }
 
-    static public function read(string $filePath): string {
+    public static function read(string $filePath): string {
         return file_get_contents($filePath);
     }
 
-    static public function exists(string $filePath): bool {
+    public static function exists(string $filePath): bool {
         return file_exists($filePath);
     }
 
-    static public function append(string $filePath, mixed $content): void {
+    public static function append(string $filePath, mixed $content): void {
         if (!is_string($content))
             $content = json_encode($content);
         self::write($filePath, "a", "$content\n");
     }
 
-    static public function set(string $filePath, mixed $content): void {
+    public static function set(string $filePath, mixed $content): void {
         self::write($filePath, "w", $content);
     }
 
-    static public function clear(string $filePath): void {
+    public static function clear(string $filePath): void {
         self::set($filePath, "");
     }
 
-    static private function write(string $filePath, string $mode, mixed $content): void {
+    private static function write(string $filePath, string $mode, mixed $content): void {
         self::createDirectoryIfNotExists(dirname($filePath));
 
         if (!$fileHandler = fopen($filePath, $mode)) {
-            LogService::error(LogFile::FILE_ACCESS, "Could not access file '$filePath");
+            LogService::error("Could not access file '$filePath");
             throw new RuntimeException("Could not open file '$filePath'");
         }
         self::requireLockFile($fileHandler);
@@ -83,13 +82,13 @@ class FileService {
         fclose($fileHandler);
     }
 
-    static private function createDirectoryIfNotExists(string $directoryPath): void {
+    private static function createDirectoryIfNotExists(string $directoryPath): void {
         if (!is_dir($directoryPath)) {
             mkdir($directoryPath, self::$DEFAULT_FILE_PERMISSION, true);
         }
     }
 
-    static private function requireLockFile($resource): void {
+    private static function requireLockFile($resource): void {
         if (!is_resource($resource))
             throw new InvalidArgumentException(sprintf('Argument must be a valid resource type. %s given.', gettype($resource)));
 

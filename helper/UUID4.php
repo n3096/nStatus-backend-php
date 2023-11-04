@@ -8,7 +8,7 @@ use Throwable;
 class UUID4 {
     private function __construct () {}
 
-    static public function generate(): string|FALSE {
+    public static function generate(): string|FALSE {
         try {
             $data = random_bytes(16);
 
@@ -21,13 +21,13 @@ class UUID4 {
         } catch (Throwable) {return FALSE;}
     }
 
-    static public function validate(string $string): string {
+    public static function validate(string $string): string {
         if (!self::isValid($string))
             throw new InvalidArgumentException("Attribute 'id' is not a valid UUID '$string'");
         return $string;
     }
 
-    static public function isValid(string $string): bool {
+    public static function isValid(string $string): bool {
         $uuidPattern = '/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/';
         return preg_match($uuidPattern, $string) === 1;
     }

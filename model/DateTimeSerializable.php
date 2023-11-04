@@ -9,7 +9,7 @@ use ReturnTypeWillChange;
 use Throwable;
 
 class DateTimeSerializable extends DateTime implements JsonSerializable {
-    static public function parse(string $string): DateTimeSerializable {
+    public static function parse(string $string): DateTimeSerializable {
         try {
             return new DateTimeSerializable($string);
         } catch (Throwable) {

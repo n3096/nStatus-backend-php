@@ -2,11 +2,11 @@
 
 namespace service;
 
+use DateInterval;
 use helper\mapper\ArrayMapper;
 use helper\mapper\ServerDtoMapper;
 use helper\mapper\ServiceCheckMapper;
 use helper\mapper\ServiceDtoMapper;
-use model\configuration\LogFile;
 use model\DateTimeSerializable;
 use model\dto\ApiInformationDto;
 use model\dto\ServiceDto;
@@ -17,121 +17,158 @@ use model\Status;
 use Throwable;
 
 class ApiService {
-    static private string $BASE_PATH = __DIR__ . "/../api/";
-    static private string $DEFAULT_FILE_NAME = 'index.json';
+    private static string $BASE_PATH = __DIR__ . "/../api/";
+    private static string $DEFAULT_FILE_NAME = 'index.json';
+    private static string|null $CONFIGURATION_UPDATE_INTERVAL = null;
     private function __construct() {}
-    static public function getBasePath(): string {
+    public static function getBasePath(): string {
         return self::$BASE_PATH;
     }
 
-    static public function updateStatistics(ServicesCheckStatistics $servicesCheckStatistics): void {
+    public static function updateStatistics(ServicesCheckStatistics $servicesCheckStatistics): void {
         $path = self::$BASE_PATH . 'statistics/';
         self::updateServicesCheckStatisticsHistory($path, $servicesCheckStatistics);
         self::updateServicesCheckStatisticsRunTimestamps($path, $servicesCheckStatistics->timestamp);
     }
 
-    static private function updateServicesCheckStatisticsHistory(string $path, ServicesCheckStatistics $checksStatistics): void {
+    private static function updateServicesCheckStatisticsHistory(string $path, ServicesCheckStatistics $checksStatistics): void {
         try {
             $path .= 'servicesCheckHistory/';
             FileService::append($path . 'index.csv', $checksStatistics);
         } catch (Throwable $throwable) {
-            LogService::error(LogFile::SERVICE_CHECK, "Error when updating servicesCheckHistory statistics file ", $throwable);
+            LogService::error("Error when updating servicesCheckHistory statistics file ", $throwable);
         }
     }
 
-    static private function updateServicesCheckStatisticsRunTimestamps(string $path, DateTimeSerializable $timestamp): void {
+    private static function updateServicesCheckStatisticsRunTimestamps(string $path, DateTimeSerializable $timestamp): void {
         try {
             $filePath = $path . "runs/timestamps/" . self::$DEFAULT_FILE_NAME;
             $timestamps = FileService::exists($filePath) ? FileService::parseFile($filePath, ArrayMapper::map(new DateTimeSerializable())) : [];
             $timestamps[] = $timestamp;
             FileService::set($filePath, $timestamps);
         } catch (Throwable $throwable) {
-            LogService::error(LogFile::SERVICE_CHECK, "Error when updating timestamps for runs statistics file", $throwable);
+            LogService::error("Error when updating timestamps for runs statistics file", $throwable);
         }
     }
 
-    static public function updateApiInformation(ServicesCheckStatistics $checksStatistics, array $services): void {
+    public static function updateApiInformation(ServicesCheckStatistics $checksStatistics, array $services): void {
         try {
-            $updateInterval = ConfigurationService::get('updateInterval', self::class);
             $maxTimeout = max(array_map(function ($service) {return $service->timeout;}, $services));
-            $apiInformation = new ApiInformationDto($checksStatistics->logSize, $checksStatistics->apiSize, $maxTimeout, $updateInterval, $checksStatistics->runTime);
+            $apiInformation = new ApiInformationDto($checksStatistics->logSize, $checksStatistics->apiSize, $maxTimeout, self::getUpdateInterval(), $checksStatistics->runTime);
             FileService::set(self::$BASE_PATH . self::$DEFAULT_FILE_NAME, $apiInformation);
         } catch (Throwable $throwable) {
-            LogService::error(LogFile::SERVICE_CHECK, "Error when updating api base information file ", $throwable);
+            LogService::error("Error when updating api base information file ", $throwable);
         }
     }
 
-    static public function updateServers(array $servers): void {
+    private static function getUpdateInterval(): int {
+        return self::$CONFIGURATION_UPDATE_INTERVAL ?? self::$CONFIGURATION_UPDATE_INTERVAL = ConfigurationService::get('updateInterval', self::class) ?? 300;
+    }
+
+    public static function updateServers(array $servers): void {
         try {
             $path = self::$BASE_PATH . 'servers/' . self::$DEFAULT_FILE_NAME;
             FileService::set($path, array_map(ServerDtoMapper::map(), $servers));
         } catch (Throwable $throwable) {
-            LogService::error(LogFile::SERVICE_CHECK, "Error when updating servers api file", $throwable);
+            LogService::error("Error when updating servers api file", $throwable);
         }
     }
 
-    static public function updateServices(array $servicesMap): void {
+    public static function updateServices(array $serviceMaps): void {
         $path = self::$BASE_PATH . 'services/';
-        $serviceDtos = [];
-        foreach ($servicesMap as $serviceMap) {
-            if ($serviceDto = self::tryUpdateService($path, $serviceMap['service'], $serviceMap['serviceCheck']))
-                $serviceDtos[] = $serviceDto;
+        $serviceMapResult = [];
+
+        foreach ($serviceMaps as $serviceMap) {
+            $serviceDto = self::tryUpdateService($path, $serviceMap['service'], $serviceMap['serviceCheck']);
+            $serviceMapResult[] = $serviceDto;
         }
-        self::updateServicesEndpoint($path, $serviceDtos);
+        self::updateServicesEndpoint($path, $serviceMapResult);
     }
 
-    static private function tryUpdateService(string $path, Service $service, ServiceCheck|FALSE $serviceCheck): ServiceDto|FALSE {
-        return ($serviceCheck) ?
-            self::updateService($path, $service, $serviceCheck)
-            : self::getServiceEndpoint($path, $service);
-    }
-
-    static private function updateService(string $path, Service $service, ServiceCheck $serviceCheck): ServiceDto|FALSE {
+    private static function tryUpdateService(string $path, Service $service, ServiceCheck $serviceCheck): ServiceDto {
+        $path .= "$service->id/";
+        $currentServiceDto = self::getServiceEndpoint($path);
         try {
-            $path .= "$service->id/";
-            $serviceCheckHistory = self::updateServiceHistory($path, $serviceCheck);
+            $serviceCheckHistory = self::updateServiceHistory($path, $serviceCheck, $currentServiceDto);
             return self::updateServiceEndpoint($path, $service, $serviceCheck->status, $serviceCheckHistory);
         } catch (Throwable $throwable) {
-            LogService::error(LogFile::SERVICE_CHECK, "Error when updating service '$service->id'", $throwable);
+            LogService::error("Error when updating service '$service->id'", $throwable);
         }
-        return FALSE;
+        return $currentServiceDto;
     }
 
-    static private function updateServiceHistory(string $path, ServiceCheck $serviceCheck): array {
+    private static function updateServiceHistory(string $path, ServiceCheck $serviceCheck, ServiceDto|FALSE $currentServiceDto): array {
         $filePath = $path . "service-check-history/full/" . self::$DEFAULT_FILE_NAME;
         $serviceChecks = FileService::exists($filePath) ? FileService::parseFile($filePath, ArrayMapper::map(ServiceCheckMapper::map())) : [];
-        if (self::hasStatusChanged($serviceChecks, $serviceCheck)) {
+
+        if ($hasChanges = self::createStatusCheckUnknownWhenLatestUpdateWasTooFar($serviceCheck, $currentServiceDto))
+            $serviceChecks[] = $hasChanges;
+        if ($hasChanges = $hasChanges || self::hasStatusChanged($serviceCheck, $serviceChecks))
             $serviceChecks[] = $serviceCheck;
-            FileService::set($filePath, $serviceChecks);
-        }
+        if ($hasChanges) FileService::set($filePath, $serviceChecks);
         return $serviceChecks;
     }
 
-    static private function updateServiceEndpoint(string $path, Service $service, Status $status, array $serviceChecks): ServiceDto {
-        $serviceDto = ServiceDto::of($service, $status, $serviceChecks);
-        FileService::set($path . self::$DEFAULT_FILE_NAME, json_encode($serviceDto));
-        return $serviceDto;
+    private static function createStatusCheckUnknownWhenLatestUpdateWasTooFar(ServiceCheck $latestServiceDto, ServiceDto|FALSE $currentServiceDto): ServiceCheck|FALSE {
+        if (!$currentServiceDto)
+            return FALSE;
+
+        if ($latestServiceDto->status == Status::UNKNOWN)
+            return FALSE;
+
+        $updateIntervalTolerance = self::getUpdateInterval() * 2;
+        $secondsSinceLatestUpdate = time() - $currentServiceDto->latestUpdate->getTimestamp();
+        if ($secondsSinceLatestUpdate < $updateIntervalTolerance)
+            return FALSE;
+
+        $timestamp = $currentServiceDto->latestUpdate;
+        $timestamp->add(DateInterval::createFromDateString("$updateIntervalTolerance seconds"));
+
+        LogService::warning("Add Status 'UNKNOWN' to Service with id '$currentServiceDto->id' due to inactivity on status checks for '$secondsSinceLatestUpdate' seconds");
+        $bla = new ServiceCheck($latestServiceDto->hostName,
+            $latestServiceDto->port,
+            $latestServiceDto->socketProtocol,
+            $latestServiceDto->fullHostName,
+            $timestamp,
+            $latestServiceDto->latency,
+            $latestServiceDto->ipv4,
+            $latestServiceDto->ipv6,
+            $latestServiceDto->forwardedHost,
+            Status::UNKNOWN,
+            $latestServiceDto->response,
+            ["Added this status due to data cleansing by server"]);
+        LogService::debug($bla);
+        return $bla;
     }
 
-    static private function hasStatusChanged(array $serviceChecks, ServiceCheck $serviceCheck): bool {
-        if (sizeof($serviceChecks) == 0)
-            return TRUE;
+    private static function hasStatusChanged(ServiceCheck $currentServiceCheck, array $serviceChecks): bool {
+        $latestServiceCheck = self::getLatestServiceCheck($serviceChecks);
+        return !$serviceChecks || $currentServiceCheck->status !== $latestServiceCheck->status;
+    }
+
+    private static function getLatestServiceCheck(array $serviceChecks): ServiceCheck|FALSE {
         usort($serviceChecks, function ($a, $b) {
             return $b->timestamp->getTimestamp() - $a->timestamp->getTimestamp();
         });
-        return $serviceChecks[0]->status !== $serviceCheck->status;
+        return $serviceChecks[0] ?? FALSE;
     }
 
-    static private function getServiceEndpoint(string $path, Service $service): ServiceDto|FALSE {
-        $path .= $service->id . '/' . self::$DEFAULT_FILE_NAME;
+    private static function updateServiceEndpoint(string $path, Service $service, Status $status, array $serviceChecks): ServiceDto {
+        $serviceDto = ServiceDto::of($service, $status, $serviceChecks);
+        FileService::set($path . self::$DEFAULT_FILE_NAME, $serviceDto);
+        return $serviceDto;
+    }
+
+    private static function getServiceEndpoint(string $path): ServiceDto|FALSE {
+        $path .= self::$DEFAULT_FILE_NAME;
         return FileService::exists($path) ? FileService::parseFile($path, ServiceDtoMapper::map()) : FALSE;
     }
 
-    static private function updateServicesEndpoint(string $path, array $serviceDtos): void {
+    private static function updateServicesEndpoint(string $path, array $serviceDtos): void {
         try {
             FileService::set($path . self::$DEFAULT_FILE_NAME, $serviceDtos);
         } catch (Throwable $throwable) {
-            LogService::error(LogFile::SERVICE_CHECK, "Error when updating services api file", $throwable);
+            LogService::error("Error when updating services api file", $throwable);
         }
     }
 }

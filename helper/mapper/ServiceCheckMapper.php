@@ -13,7 +13,7 @@ class ServiceCheckMapper {
         return new ServiceCheck($object->hostName, $object->port, SocketProtocol::parse($object->socketProtocol), $object->fullHostName, DateTimeSerializable::parse($object->timestamp), $object->latency, $object->ipv4, $object->ipv6, $object->forwardedHost, Status::parse($object->status), $object->response, (array)$object->notes);
     }
 
-    static public function map(): callable {
+    public static function map(): callable {
         return new ServiceCheckMapper();
     }
 }
