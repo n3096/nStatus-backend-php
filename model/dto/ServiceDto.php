@@ -15,13 +15,13 @@ class ServiceDto {
     public array $serviceCheckHistory = [];
     public DateTimeSerializable $latestUpdate;
 
-    public function __construct(string $id, string $name, string $icon, Status $status, array $serviceCheckHistory) {
+    public function __construct(string $id, string $name, string $icon, Status $status, array $serviceCheckHistory, DateTimeSerializable $latestUpdate = new DateTimeSerializable()) {
         $this->id = UUID4::validate($id);
         $this->name = $name;
         $this->icon = $icon;
         $this->status = $status;
         $this->serviceCheckHistory = $this->mapServiceCheckHistory($serviceCheckHistory);
-        $this->latestUpdate = new DateTimeSerializable();
+        $this->latestUpdate = $latestUpdate;
     }
 
     private function mapServiceCheckHistory(array $serviceCheckHistory): array {

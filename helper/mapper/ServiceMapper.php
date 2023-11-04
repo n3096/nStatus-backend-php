@@ -12,7 +12,7 @@ class ServiceMapper {
         return new Service( $object->id, $object->name, $object->hostName, SocketProtocol::parse($object->socketProtocol), $object->port, $object->icon, $object->enabled, $object->timeout);
     }
 
-    static public function map(): callable {
+    public static function map(): callable {
         return new ServiceMapper();
     }
 }

@@ -4,7 +4,6 @@ namespace service;
 
 use CurlHandle;
 use CurlMultiHandle;
-use model\configuration\LogFile;
 use model\DateTimeSerializable;
 use model\security\nSecure;
 use model\Service;
@@ -14,12 +13,12 @@ use model\Status;
 use Throwable;
 
 class ServiceCheckMultithreadingService {
-    static private string $SALT_LIST_FILE_PATH = __DIR__ . '/../tmp/getTemporarySalts.php';
-    static private string $PASSWORD = 'PD3&3cfpU*T$b&^*G&KxX8Gn&@TUEMWd7^#x*4J*V&9!!h%*TVidiLx@A8EzkKD9Sr@q2ophVsVT$k$tN@TnA#m&x^Syj2ZJtKvj!ayUcd@QHDsWf4EuxdM3BWfC6%t*';
+    private static string $SALT_LIST_FILE_PATH = __DIR__ . '/../tmp/getTemporarySalts.php';
+    private static string $PASSWORD = 'PD3&3cfpU*T$b&^*G&KxX8Gn&@TUEMWd7^#x*4J*V&9!!h%*TVidiLx@A8EzkKD9Sr@q2ophVsVT$k$tN@TnA#m&x^Syj2ZJtKvj!ayUcd@QHDsWf4EuxdM3BWfC6%t*';
 
     private function __construct() {}
 
-    static public function parseService(?string $data, ?string $salt): Service|FALSE {
+    public static function parseService(?string $data, ?string $salt): Service|FALSE {
         if (empty($data) || empty($salt))
             return FALSE;
 
@@ -41,19 +40,19 @@ class ServiceCheckMultithreadingService {
         $serviceCurlMap = [];
         $hostUrl = self::getHostUrl();
         foreach($services as $service) {
-            if ($curl = self::getServiceCurlHandle($service, $hash, $salts, $hostUrl, $headerDate)) {
+            if ($curl = self::getServiceCurlHandle($service, $hash, $salts, $hostUrl, $headerDate))
                 curl_multi_add_handle($multiCurlHandler, $curl);
-                $serviceCurlMap[] = ['service' => $service, 'curl' => $curl];
-            } else {
-                LogService::error(LogFile::SERVICE_MULTITHREADING, "Could not create Curl for service with id '$service->id'");
-            }
+            else
+                LogService::error("Could not create Curl for service with id '$service->id'");
+            $serviceCurlMap[] = ['service' => $service, 'curl' => $curl];
         }
 
         self::executeAndWaitMultiCurl($multiCurlHandler);
 
         $serviceCheckMap = [];
         foreach($serviceCurlMap as $serviceCurlEntry){
-            curl_multi_remove_handle($multiCurlHandler, $serviceCurlEntry['curl']);
+            if ($serviceCurlEntry['curl'])
+                curl_multi_remove_handle($multiCurlHandler, $serviceCurlEntry['curl']);
             $serviceCheckMap[$serviceCurlEntry['service']->id] = [
                 'service' => $serviceCurlEntry['service'],
                 'serviceCheck' => self::parseCurlResponse($serviceCurlEntry['service'], $serviceCurlEntry['curl'])];
@@ -64,19 +63,19 @@ class ServiceCheckMultithreadingService {
         return $serviceCheckMap;
     }
 
-    static private function createLocalSaltFile(array $salts, string $hash): void {
+    private static function createLocalSaltFile(array $salts, string $hash): void {
         $salt = nSecure::encrypt($salts, $hash, [$hash]);
         FileService::set(self::$SALT_LIST_FILE_PATH, "<?php\nfunction getSalt(): string { return '$salt'; }");
     }
 
-    static private function getLocalFileSaltList(string $hash): array|FALSE {
+    private static function getLocalFileSaltList(string $hash): array|FALSE {
         try {
             require_once self::$SALT_LIST_FILE_PATH;
             return nSecure::decrypt(getSalt(), $hash, [$hash]);
         } catch (Throwable) { return FALSE; }
     }
 
-    static private function getServiceCurlHandle(Service $service, string $hash, array $salts, string $hostUrl, string $headerDate): CurlHandle|FALSE {
+    private static function getServiceCurlHandle(Service $service, string $hash, array $salts, string $hostUrl, string $headerDate): CurlHandle|FALSE {
         $timeout = $service->timeout + 5;
         $serviceHash = nSecure::encrypt($service, $hash, $salts);
         $url = "{$hostUrl}api/services/$serviceHash/serviceCheck";
@@ -96,7 +95,7 @@ class ServiceCheckMultithreadingService {
         return $curl;
     }
 
-    static public function getHostUrl(): string {
+    public static function getHostUrl(): string {
         $basePaths = ConfigurationService::get("basePaths", self::class);
         $serverName = $_SERVER['SERVER_NAME'] ?? "localhost";
         $basePath = $basePaths[$serverName] ?? $basePaths[0] ?? "";
@@ -105,18 +104,21 @@ class ServiceCheckMultithreadingService {
         return "https://$serverName/$basePath";
     }
 
-    static private function executeAndWaitMultiCurl(CurlMultiHandle $multiCurlHandler): void {
+    private static function executeAndWaitMultiCurl(CurlMultiHandle $multiCurlHandler): void {
         do {
             $status = curl_multi_exec($multiCurlHandler, $isRunning);
             if ($isRunning) curl_multi_select($multiCurlHandler);
         } while ($isRunning && $status == CURLM_OK);
     }
 
-    private static function parseCurlResponse(Service $service, CurlHandle $curlHandle): ServiceCheck|FALSE {
+    private static function parseCurlResponse(Service $service, CurlHandle|FALSE $curlHandle): ServiceCheck {
+        if (!$curlHandle)
+            return self::createUnknownServiceCheck($service);
+
         $httpResponseCode = curl_getinfo($curlHandle, CURLINFO_HTTP_CODE);
         if ($httpResponseCode < 200 || $httpResponseCode >= 300) {
-            LogService::error(LogFile::SERVICE_MULTITHREADING, "Could not internally curl ServiceCheck for service with id '$service->id' due to http '$httpResponseCode'");
-            return FALSE;
+            LogService::error("Could not internally curl ServiceCheck for service with id '$service->id' due to http '$httpResponseCode'");
+            return self::createUnknownServiceCheck($service);
         }
 
         try {
@@ -137,8 +139,22 @@ class ServiceCheckMultithreadingService {
                 $serviceCheckMap['response'],
                 $serviceCheckMap['notes']);
         } catch (Throwable $throwable) {
-            LogService::error(LogFile::SERVICE_MULTITHREADING, "Could not parse response of internal ServiceCheck curl for service with id '$service->id' as ServiceCheck: '$response'", $throwable);
-            return FALSE;
+            LogService::error("Could not parse response of internal ServiceCheck curl for service with id '$service->id' as ServiceCheck: '$response'", $throwable);
+            return self::createUnknownServiceCheck($service);
         }
+    }
+
+    private static function createUnknownServiceCheck(Service $service): ServiceCheck {
+        return ServiceCheck::createByService(
+            $service,
+            'unknown',
+            new DateTimeSerializable(),
+            0,
+            'unknown',
+            'unknown',
+            'unknown',
+            Status::UNKNOWN,
+            [],
+            ["Added this ServiceCheck due to issue of identifying the status"]);
     }
 }

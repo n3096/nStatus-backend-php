@@ -3,7 +3,6 @@
 namespace service;
 
 use InvalidArgumentException;
-use model\configuration\LogFile;
 use model\DateTimeSerializable;
 use model\Service;
 use model\ServiceCheck;
@@ -13,23 +12,23 @@ use model\Status;
 class ServiceCheckService {
     private function __construct() {}
 
-    static public function checkServices(): void {
-        LogService::info(LogFile::SERVICE_CHECK, "Started checking status of services");
+    public static function checkServices(): void {
+        LogService::info("Started checking status of services");
         StatisticService::startServicesCheckStatistics();
         $services = EntityService::getServices();
         $serviceCheckMap = ServiceCheckMultithreadingService::checkServicesMultithreaded($services);
 
-        LogService::debug(LogFile::SERVICE_CHECK, "Updating API files");
+        LogService::debug("Updating API files");
         ApiService::updateServers(EntityService::getServers());
         ApiService::updateServices($serviceCheckMap);
         $servicesCheckStatistics = StatisticService::finishServicesCheckStatistics();
         ApiService::updateApiInformation($servicesCheckStatistics, $services);
         ApiService::updateStatistics($servicesCheckStatistics);
 
-        LogService::info(LogFile::SERVICE_CHECK, "Finished checking status of services");
+        LogService::info("Finished checking status of services");
     }
 
-    static public function checkService(?string $data, ?string $salt): ServiceCheck|FALSE {
+    public static function checkService(?string $data, ?string $salt): ServiceCheck|FALSE {
         $service = ServiceCheckMultithreadingService::parseService($data, $salt);
         if (!$service) return FALSE;
 
@@ -66,26 +65,26 @@ class ServiceCheckService {
         return ServiceCheck::createByService($service, $fullHostName, $dateTime, $latency, self::getIpv4($service), self::getIpv6($service), $forwardedHost, $status, $response, $notes);
     }
 
-    static private function getActualHostName(string $hostName, SocketProtocol $socketProtocol): string {
+    private static function getActualHostName(string $hostName, SocketProtocol $socketProtocol): string {
         return ($socketProtocol === SocketProtocol::HTTPS ? "ssl://" : "") . $hostName;
     }
 
-    static private function getIpv4(Service $service): ?string {
+    private static function getIpv4(Service $service): ?string {
         $host = gethostbyname($service->hostName);
         if ($host === $service->hostName)
             return dns_get_record($host, DNS_A)[0]["ip"] ?? null;
         return $host;
     }
 
-    static private function getIpv6(Service $service): ?string {
+    private static function getIpv6(Service $service): ?string {
         return dns_get_record($service->hostName, DNS_AAAA)[0]["ipv6"] ?? null;
     }
 
-    static private function getForwardedHost(Service $service): ?string {
+    private static function getForwardedHost(Service $service): ?string {
         return dns_get_record($service->hostName, DNS_A)[0]["host"] ?? dns_get_record($service->hostName, DNS_AAAA)[0]["host"] ?? null;
     }
 
-    static private function getResponse($resource, Service $service, Status &$status, array &$notes): array {
+    private static function getResponse($resource, Service $service, Status &$status, array &$notes): array {
         if (!is_resource($resource))
             throw new InvalidArgumentException(sprintf('Argument must be a valid resource type. %s given.', gettype($resource)));
 
@@ -95,7 +94,7 @@ class ServiceCheckService {
         };
     }
 
-    static private function getResponseForHttpAndHttps($resource, Service $service, Status &$status, array &$notes): array {
+    private static function getResponseForHttpAndHttps($resource, Service $service, Status &$status, array &$notes): array {
         if (!is_resource($resource))
             throw new InvalidArgumentException(sprintf('Argument must be a valid resource type. %s given.', gettype($resource)));
 

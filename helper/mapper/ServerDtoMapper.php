@@ -10,7 +10,7 @@ class ServerDtoMapper {
         return new ServerDto($server);
     }
 
-    static public function map(): callable {
+    public static function map(): callable {
         return new ServerDtoMapper();
     }
 }

@@ -6,12 +6,11 @@ set_time_limit(120);
 
 require_once 'autoloader.php';
 
-use model\configuration\LogFile;
 use service\LogService;
 use service\ServiceCheckService;
 
 try {
     ServiceCheckService::checkServices();
 } catch (Throwable $throwable) {
-    LogService::error(LogFile::SERVICE_CHECK, "Error when checking services", $throwable);
+    LogService::error("Error when checking services", $throwable);
 }

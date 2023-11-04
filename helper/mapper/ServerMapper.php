@@ -3,7 +3,6 @@
 namespace helper\mapper;
 
 use InvalidArgumentException;
-use model\configuration\LogFile;
 use model\Server;
 use service\LogService;
 use stdClass;
@@ -21,13 +20,13 @@ class ServerMapper {
             try {
                 $services[] = call_user_func(ServiceMapper::map(), $service);
             } catch (Throwable $throwable) {
-                LogService::error(LogFile::MAPPING, "Could not map to Service in Server with id '$object->id' on array key '$key'", $throwable);
+                LogService::error("Could not map to Service in Server with id '$object->id' on array key '$key'", $throwable);
             }
         }
         return new Server($object->id, $object->name, $services);
     }
 
-    static public function map(): callable {
+    public static function map(): callable {
         return new ServerMapper();
     }
 }

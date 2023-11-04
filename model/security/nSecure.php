@@ -17,7 +17,7 @@ class nSecure
     private static string $SECRET_KEY = '*#y&zjp3*#XFwQ3crBEJokU#A&@SEUr&eMrKf@hPE7H%VB8N@uZZ#D$ao%A^^JV8Ufy!BSD2jG6AYFGLHbFX9QAQN*DM^g$#swx!Dv8%H4qTAco^rMzLCj#CofVU5eYT';
     private static string $SECRET_IV = '*ATD7^@N$zaA6njXnj7f*^8pwg@ScHPhwp%q3zu4q*RmgsY!^RuDjXNHS&38LZVZSqBKZ2MXomu$4&kJiKg5J&m5SHpoP$AR&AzUnAHdTCwkXdf5!BdchHjcyd&B&Fx*';
 
-    static public function encrypt(mixed $data, string $password, array $salts): string {
+    public static function encrypt(mixed $data, string $password, array $salts): string {
         $dataString = json_encode($data);
         $hash = self::nHash($password, $salts);
 
@@ -25,14 +25,14 @@ class nSecure
         return urlencode(base64_encode($actualEncryptedString));
     }
 
-    static public function decrypt(string $string, string $password, array $salts): mixed {
+    public static function decrypt(string $string, string $password, array $salts): mixed {
         $hash = self::nHash($password, $salts);
         $actualEncryptedString = base64_decode(urldecode($string));
         $decryptedString = openssl_decrypt($actualEncryptedString, self::$ENCRYPT_METHOD, self::getKey($hash, $salts), 0, self::getIv($hash, $salts));
         return json_decode($decryptedString, TRUE);
     }
 
-    static public function generateSaltList(): array {
+    public static function generateSaltList(): array {
         $hashList = [];
         $hashListLength = rand(5,9);
 
@@ -42,7 +42,7 @@ class nSecure
         return $hashList;
     }
 
-    static private function generateRandomString(int $length): string {
+    private static function generateRandomString(int $length): string {
         $characters = '0123456789abcdefghilkmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!@#$%^&*()_+=-';
         $charLength = strlen($characters);
         $randomString = '';
@@ -53,16 +53,16 @@ class nSecure
         return $randomString;
     }
 
-    static private function getKey(string $hash, array $salts): string {
+    private static function getKey(string $hash, array $salts): string {
         return hash('sha256', self::nHash(self::$SECRET_KEY . $hash, $salts));
     }
 
-    static private function getIv(string $hash, array $salts): string {
+    private static function getIv(string $hash, array $salts): string {
         $string32Bit = md5(substr(hash('sha256', self::nHash($hash . self::$SECRET_IV, $salts)), 0, 16));
         return implode('', array_filter(str_split($string32Bit), function($key) { return $key % 2 == 0; }, ARRAY_FILTER_USE_KEY));
     }
 
-    static private function nHash(string $string, array $salts): string {
+    private static function nHash(string $string, array $salts): string {
         $string = base64_encode(hash('sha256', md5($string) . self::$FIXED_SALT));
         foreach ($salts as $salt) {
             $string = md5(hash('sha256', $string . self::$FIXED_SALT) . $salt);

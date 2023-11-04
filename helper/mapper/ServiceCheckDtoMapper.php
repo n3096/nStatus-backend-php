@@ -12,7 +12,7 @@ class ServiceCheckDtoMapper {
         return new ServiceCheckDto(DateTimeSerializable::parse($object->timestamp), $object->latency, Status::parse($object->status));
     }
 
-    static public function map(): callable {
+    public static function map(): callable {
         return new ServiceCheckDtoMapper();
     }
 }

@@ -3,7 +3,7 @@
 namespace helper\mapper;
 
 use InvalidArgumentException;
-use model\configuration\LogFile;
+use model\DateTimeSerializable;
 use model\dto\ServiceDto;
 use model\Status;
 use service\LogService;
@@ -22,13 +22,13 @@ class ServiceDtoMapper {
             try {
                 $serviceCheckHistory[] = call_user_func(ServiceCheckDtoMapper::map(), $serviceCheckDto);
             } catch (Throwable $throwable) {
-                LogService::error(LogFile::MAPPING, "Could not map to ServiceCheckDto in Service with id '$object->id' on array key '$key'", $throwable);
+                LogService::error("Could not map to ServiceCheckDto in Service with id '$object->id' on array key '$key'", $throwable);
             }
         }
-        return new ServiceDto($object->id, $object->name, $object->icon, Status::parse($object->status), $serviceCheckHistory);
+        return new ServiceDto($object->id, $object->name, $object->icon, Status::parse($object->status), $serviceCheckHistory, DateTimeSerializable::parse($object->latestUpdate));
     }
 
-    static public function map(): callable {
+    public static function map(): callable {
         return new ServiceDtoMapper();
     }
 }
