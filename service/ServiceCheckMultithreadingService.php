@@ -54,8 +54,9 @@ class ServiceCheckMultithreadingService {
         $serviceCheckMap = [];
         foreach($serviceCurlMap as $serviceCurlEntry){
             curl_multi_remove_handle($multiCurlHandler, $serviceCurlEntry['curl']);
-            if ($serviceCheck = self::parseCurlResponse($serviceCurlEntry['service'], $serviceCurlEntry['curl'], $headerDate))
-                $serviceCheckMap[$serviceCurlEntry['service']->id] = ['service' => $serviceCurlEntry['service'], 'serviceCheck' => $serviceCheck];
+            $serviceCheckMap[$serviceCurlEntry['service']->id] = [
+                'service' => $serviceCurlEntry['service'],
+                'serviceCheck' => self::parseCurlResponse($serviceCurlEntry['service'], $serviceCurlEntry['curl'])];
         }
         curl_multi_close($multiCurlHandler);
         FileService::clear(self::$SALT_LIST_FILE_PATH);
@@ -111,7 +112,7 @@ class ServiceCheckMultithreadingService {
         } while ($isRunning && $status == CURLM_OK);
     }
 
-    private static function parseCurlResponse(Service $service, CurlHandle $curlHandle, string $headerDate): ServiceCheck|FALSE {
+    private static function parseCurlResponse(Service $service, CurlHandle $curlHandle): ServiceCheck|FALSE {
         $httpResponseCode = curl_getinfo($curlHandle, CURLINFO_HTTP_CODE);
         if ($httpResponseCode < 200 || $httpResponseCode >= 300) {
             LogService::error(LogFile::SERVICE_MULTITHREADING, "Could not internally curl ServiceCheck for service with id '$service->id' due to http '$httpResponseCode'");

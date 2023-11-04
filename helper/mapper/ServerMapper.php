@@ -21,7 +21,7 @@ class ServerMapper {
             try {
                 $services[] = call_user_func(ServiceMapper::map(), $service);
             } catch (Throwable $throwable) {
-                LogService::error(LogFile::MAPPING, "Could not map to Service in server with id '$object->id' on array key '$key'", $throwable);
+                LogService::error(LogFile::MAPPING, "Could not map to Service in Server with id '$object->id' on array key '$key'", $throwable);
             }
         }
         return new Server($object->id, $object->name, $services);

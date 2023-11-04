@@ -16,13 +16,14 @@ class ServiceCheckService {
     static public function checkServices(): void {
         LogService::info(LogFile::SERVICE_CHECK, "Started checking status of services");
         StatisticService::startServicesCheckStatistics();
-        $serviceCheckMap = ServiceCheckMultithreadingService::checkServicesMultithreaded(EntityService::getServices());
+        $services = EntityService::getServices();
+        $serviceCheckMap = ServiceCheckMultithreadingService::checkServicesMultithreaded($services);
 
         LogService::debug(LogFile::SERVICE_CHECK, "Updating API files");
         ApiService::updateServers(EntityService::getServers());
         ApiService::updateServices($serviceCheckMap);
         $servicesCheckStatistics = StatisticService::finishServicesCheckStatistics();
-        ApiService::updateApiInformation($servicesCheckStatistics, array_map(function($serviceMap) {return $serviceMap['service'];}, $serviceCheckMap));
+        ApiService::updateApiInformation($servicesCheckStatistics, $services);
         ApiService::updateStatistics($servicesCheckStatistics);
 
         LogService::info(LogFile::SERVICE_CHECK, "Finished checking status of services");

@@ -10,9 +10,13 @@ class ServiceCheckDto {
     public DateTimeSerializable $timestamp;
     public int $latency;
     public Status $status;
-    public function __construct(ServiceCheck $serviceCheck) {
-        $this->timestamp = $serviceCheck->timestamp;
-        $this->latency = $serviceCheck->latency;
-        $this->status = $serviceCheck->status;
+    public function __construct(DateTimeSerializable $timestamp, int $latency, Status $status) {
+        $this->timestamp = $timestamp;
+        $this->latency = $latency;
+        $this->status = $status;
+    }
+
+    public static function of(ServiceCheck $serviceCheck): ServiceCheckDto {
+        return new ServiceCheckDto($serviceCheck->timestamp, $serviceCheck->latency, $serviceCheck->status);
     }
 }

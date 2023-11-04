@@ -5,6 +5,7 @@ namespace service;
 use helper\mapper\ArrayMapper;
 use helper\mapper\ServerDtoMapper;
 use helper\mapper\ServiceCheckMapper;
+use helper\mapper\ServiceDtoMapper;
 use model\configuration\LogFile;
 use model\DateTimeSerializable;
 use model\dto\ApiInformationDto;
@@ -73,18 +74,16 @@ class ApiService {
         $path = self::$BASE_PATH . 'services/';
         $serviceDtos = [];
         foreach ($servicesMap as $serviceMap) {
-            if ($serviceDto = self::updateService($path, $serviceMap['service'], $serviceMap['serviceCheck']))
+            if ($serviceDto = self::tryUpdateService($path, $serviceMap['service'], $serviceMap['serviceCheck']))
                 $serviceDtos[] = $serviceDto;
         }
         self::updateServicesEndpoint($path, $serviceDtos);
     }
 
-    static private function updateServicesEndpoint(string $path, array $serviceDtos): void {
-        try {
-            FileService::set($path . self::$DEFAULT_FILE_NAME, $serviceDtos);
-        } catch (Throwable $throwable) {
-            LogService::error(LogFile::SERVICE_CHECK, "Error when updating services api file", $throwable);
-        }
+    static private function tryUpdateService(string $path, Service $service, ServiceCheck|FALSE $serviceCheck): ServiceDto|FALSE {
+        return ($serviceCheck) ?
+            self::updateService($path, $service, $serviceCheck)
+            : self::getServiceEndpoint($path, $service);
     }
 
     static private function updateService(string $path, Service $service, ServiceCheck $serviceCheck): ServiceDto|FALSE {
@@ -94,8 +93,8 @@ class ApiService {
             return self::updateServiceEndpoint($path, $service, $serviceCheck->status, $serviceCheckHistory);
         } catch (Throwable $throwable) {
             LogService::error(LogFile::SERVICE_CHECK, "Error when updating service '$service->id'", $throwable);
-            return FALSE;
         }
+        return FALSE;
     }
 
     static private function updateServiceHistory(string $path, ServiceCheck $serviceCheck): array {
@@ -108,6 +107,12 @@ class ApiService {
         return $serviceChecks;
     }
 
+    static private function updateServiceEndpoint(string $path, Service $service, Status $status, array $serviceChecks): ServiceDto {
+        $serviceDto = ServiceDto::of($service, $status, $serviceChecks);
+        FileService::set($path . self::$DEFAULT_FILE_NAME, json_encode($serviceDto));
+        return $serviceDto;
+    }
+
     static private function hasStatusChanged(array $serviceChecks, ServiceCheck $serviceCheck): bool {
         if (sizeof($serviceChecks) == 0)
             return TRUE;
@@ -117,9 +122,16 @@ class ApiService {
         return $serviceChecks[0]->status !== $serviceCheck->status;
     }
 
-    static private function updateServiceEndpoint(string $path, Service $service, Status $status, array $serviceChecks): ServiceDto {
-        $serviceDto = new ServiceDto($service, $status, $serviceChecks);
-        FileService::set($path . self::$DEFAULT_FILE_NAME, json_encode($serviceDto));
-        return $serviceDto;
+    static private function getServiceEndpoint(string $path, Service $service): ServiceDto|FALSE {
+        $path .= $service->id . '/' . self::$DEFAULT_FILE_NAME;
+        return FileService::exists($path) ? FileService::parseFile($path, ServiceDtoMapper::map()) : FALSE;
+    }
+
+    static private function updateServicesEndpoint(string $path, array $serviceDtos): void {
+        try {
+            FileService::set($path . self::$DEFAULT_FILE_NAME, $serviceDtos);
+        } catch (Throwable $throwable) {
+            LogService::error(LogFile::SERVICE_CHECK, "Error when updating services api file", $throwable);
+        }
     }
 }
