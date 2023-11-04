@@ -37,8 +37,9 @@ class FileService {
         if ($mapFunction) {
             try {
                 return call_user_func($mapFunction, $map);
-            } catch (Throwable) {
-                LogService::error(LogFile::FILE_ACCESS, "Could not map to '$mapFunction' from file '$filePath' with associative '$associative'");
+            } catch (Throwable $exception) {
+                LogService::error(LogFile::FILE_ACCESS, "Could not parse from file '$filePath'", $exception);
+                return FALSE;
             }
         }
         return $map;
