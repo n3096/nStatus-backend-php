@@ -33,34 +33,44 @@ class ServiceCheckMultithreadingService {
         $salts = nSecure::generateSaltList();
         $headerDate = gmdate('D, d M Y H:i:s T');
         $hash = self::$PASSWORD . $headerDate;
+        $hostUrl = self::getHostUrl();
 
         self::createLocalSaltFile($salts, $hash);
 
-        $multiCurlHandler = curl_multi_init();
-        $serviceCurlMap = [];
-        $hostUrl = self::getHostUrl();
-        foreach($services as $service) {
-            if ($curl = self::getServiceCurlHandle($service, $hash, $salts, $hostUrl, $headerDate))
-                curl_multi_add_handle($multiCurlHandler, $curl);
-            else
-                LogService::error("Could not create Curl for service with id '$service->id'");
-            $serviceCurlMap[] = ['service' => $service, 'curl' => $curl];
-        }
-
-        self::executeAndWaitMultiCurl($multiCurlHandler);
+        self::sortByHighestTimeout($services);
 
         $serviceCheckMap = [];
-        foreach($serviceCurlMap as $serviceCurlEntry){
-            if ($serviceCurlEntry['curl'])
-                curl_multi_remove_handle($multiCurlHandler, $serviceCurlEntry['curl']);
-            $serviceCheckMap[$serviceCurlEntry['service']->id] = [
-                'service' => $serviceCurlEntry['service'],
-                'serviceCheck' => self::parseCurlResponse($serviceCurlEntry['service'], $serviceCurlEntry['curl'])];
+        foreach (array_chunk($services, 8) as $servicesChunk) {
+            $multiCurlHandler = curl_multi_init();
+            $serviceCurlMap = [];
+            foreach ($servicesChunk as $service) {
+                if ($curl = self::getServiceCurlHandle($service, $hash, $salts, $hostUrl, $headerDate))
+                    curl_multi_add_handle($multiCurlHandler, $curl);
+                else
+                    LogService::error("Could not create Curl for service with id '$service->id'");
+                $serviceCurlMap[] = ['service' => $service, 'curl' => $curl];
+            }
+
+            self::executeAndWaitMultiCurl($multiCurlHandler);
+
+            foreach ($serviceCurlMap as $serviceCurlEntry) {
+                if ($serviceCurlEntry['curl'])
+                    curl_multi_remove_handle($multiCurlHandler, $serviceCurlEntry['curl']);
+                $serviceCheckMap[$serviceCurlEntry['service']->id] = [
+                    'service' => $serviceCurlEntry['service'],
+                    'serviceCheck' => self::parseCurlResponse($serviceCurlEntry['service'], $serviceCurlEntry['curl'])];
+            }
+            curl_multi_close($multiCurlHandler);
         }
-        curl_multi_close($multiCurlHandler);
         FileService::clear(self::$SALT_LIST_FILE_PATH);
 
         return $serviceCheckMap;
+    }
+
+    private static function sortByHighestTimeout(array &$services): void {
+        usort($services, function ($serviceA, $serviceB) {
+            return $serviceB->timeout - $serviceA->timeout;
+        });
     }
 
     private static function createLocalSaltFile(array $salts, string $hash): void {

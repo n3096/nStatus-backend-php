@@ -17,7 +17,7 @@ if ($_SERVER['HTTP_X_FORWARDED_FOR'] != $_SERVER['SERVER_ADDR']) {
 }
 
 try {
-    $response = ServiceCheckService::checkService($_GET['id'], $_SERVER['HTTP_DATE']);
+    $response = ServiceCheckService::checkEncryptedService($_GET['id'], $_SERVER['HTTP_DATE']);
     if (!$response) throw new Exception();
 } catch (Throwable $throwable) {
     LogService::error("Error when checking service", $throwable);

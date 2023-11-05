@@ -3,6 +3,7 @@
 namespace service;
 
 use model\Service;
+use RuntimeException;
 
 class EntityService {
 
@@ -29,8 +30,24 @@ class EntityService {
 
     private static function loadEntities(): void {
         $servers = ConfigurationService::get("servers", self::class);
+        self::validateServersConfiguration($servers);
         self::$servers = self::removeDisabledServices($servers);
         self::$services = self::flatServiceLists(self::$servers);
+    }
+
+    static private function validateServersConfiguration(array $servers): void {
+        $serverIds = [];
+        $serviceIds = [];
+        foreach ($servers as $server) {
+            if (in_array($server->id, $serverIds))
+                throw new RuntimeException("Configuration error. Server id '$server->id' exists multiple times");
+            $serverIds[] = $server->id;
+            foreach ($server->services as $service) {
+                if (in_array($service->id, $serviceIds))
+                    throw new RuntimeException("Configuration error. Service id '$service->id' exists multiple times");
+                $serviceIds[] = $service->id;
+            }
+        }
     }
 
     private static function removeDisabledServices(array $servers): array {

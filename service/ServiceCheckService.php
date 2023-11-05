@@ -28,18 +28,18 @@ class ServiceCheckService {
         LogService::info("Finished checking status of services");
     }
 
-    public static function checkService(?string $data, ?string $salt): ServiceCheck|FALSE {
+    public static function checkEncryptedService(?string $data, ?string $salt): ServiceCheck|FALSE {
         $service = ServiceCheckMultithreadingService::parseService($data, $salt);
-        if (!$service) return FALSE;
+        return $service ? self::checkService($service) : FALSE;
+    }
 
+    public static function checkService(Service $service): ServiceCheck {
         $notes = [];
         $response = [];
-        $forwardedHost = self::getForwardedHost($service);
-        $fullHostName = self::getActualHostName($forwardedHost ?: $service->hostName, $service->socketProtocol);
 
         $dateTime = new DateTimeSerializable();
         $latencyStart = microtime(TRUE);
-        $resource = fsockopen($fullHostName, $service->port, $errorCode, $errMessage, $service->timeout);
+        $resource = self::createResource($service, $errorCode, $errorMessage);
         $latency = intval((microtime(TRUE) - $latencyStart) * 1000); // convert to milliseconds
 
         $status = Status::UNREACHABLE;
@@ -52,8 +52,8 @@ class ServiceCheckService {
         if ($errorCode != 10061) { // filter for common unreachable error code
             if ($errorCode)
                 $notes["errorCode"] = $errorCode;
-            if ($errMessage)
-                $notes["errMessage"] = $errMessage;
+            if ($errorMessage)
+                $notes["errorMessage"] = $errorMessage;
         }
 
         if ($status === Status::REACHABLE && sizeof($notes) > 0)
@@ -62,11 +62,15 @@ class ServiceCheckService {
         if(empty($response))
             $response = (object)[];
 
-        return ServiceCheck::createByService($service, $fullHostName, $dateTime, $latency, self::getIpv4($service), self::getIpv6($service), $forwardedHost, $status, $response, $notes);
+        return ServiceCheck::createByService($service, self::getActualHostName($service->hostName, $service->socketProtocol), $dateTime, $latency, self::getIpv4($service), self::getIpv6($service), self::getForwardedHost($service), $status, $response, $notes);
     }
 
     private static function getActualHostName(string $hostName, SocketProtocol $socketProtocol): string {
         return ($socketProtocol === SocketProtocol::HTTPS ? "ssl://" : "") . $hostName;
+    }
+
+    private static function createResource(Service $service, ?int &$errorCode, ?string &$errorMessage) {
+        return fsockopen(self::getActualHostName($service->hostName, $service->socketProtocol), $service->port, $errorCode, $errorMessage, $service->timeout);
     }
 
     private static function getIpv4(Service $service): ?string {
@@ -84,7 +88,7 @@ class ServiceCheckService {
         return dns_get_record($service->hostName, DNS_A)[0]["host"] ?? dns_get_record($service->hostName, DNS_AAAA)[0]["host"] ?? null;
     }
 
-    private static function getResponse($resource, Service $service, Status &$status, array &$notes): array {
+    private static function getResponse(&$resource, Service $service, Status &$status, array &$notes): array {
         if (!is_resource($resource))
             throw new InvalidArgumentException(sprintf('Argument must be a valid resource type. %s given.', gettype($resource)));
 
@@ -94,11 +98,11 @@ class ServiceCheckService {
         };
     }
 
-    private static function getResponseForHttpAndHttps($resource, Service $service, Status &$status, array &$notes): array {
+    private static function getResponseForHttpAndHttps(&$resource, Service $service, Status &$status, array &$notes, string $path = '/', int $redirectionCounter = 0): array {
         if (!is_resource($resource))
             throw new InvalidArgumentException(sprintf('Argument must be a valid resource type. %s given.', gettype($resource)));
 
-        $request = "GET / HTTP/1.1\r\n";
+        $request = "GET $path HTTP/1.1\r\n";
         $request .= "Host: $service->hostName\r\n";
         $request .= "Connection: close\r\n";
         $request .= "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)\r\n";
@@ -115,6 +119,7 @@ class ServiceCheckService {
 
         $result = [];
         if (!$httpStatusCode) {
+            $status = Status::UNREACHABLE;
             $notes[] = "Could not parse http status code";
             return $result;
         }
@@ -124,13 +129,46 @@ class ServiceCheckService {
             $status = Status::UNREACHABLE;
             $notes[] = "Can't ensure reachability on server error";
         } elseif ($httpStatusCode >= 400) {
+            $status = Status::WARNING;
+            LogService::warning("Remove client error on request for Service with id '$service->id'");
             $notes[] = "Remove client error on request";
         } elseif ($httpStatusCode >= 300) {
-            $notes[] = "Can't ensure reachability on forwarding";
-            preg_match('/Location:.*/m', $response, $locationMatches);
-            if (isset($locationMatches[0]))
-                $notes[] = trim($locationMatches[0]);
+            if ($redirectionCounter > 10) {
+                $status = Status::WARNING;
+                LogService::warning("Already redirected Service with id '$service->id' 10 times");
+                $notes[] = "Already redirected 10 times";
+                return $result;
+            }
+            preg_match('/Location: (.*)/m', $response, $locationMatches);
+            $location = trim($locationMatches[1]);
+            if (!isset($location)) {
+                $status = Status::WARNING;
+                $notes[] = "Can't ensure reachability on forwarding without Location header";
+                LogService::warning("Can't ensure reachability on forwarding without Location header for Service with id '$service->id'");
+                return $result;
+            }
+            $url = parse_url($location);
+            if (isset($url['host']) && $url['host'] != $service->hostName) {
+                $status = Status::WARNING;
+                $notes[] = "Redirecting to a different host '{$url['host']}'";
+                LogService::warning("Redirecting Service with id '$service->id' to a different host '{$url['host']}'");
+                return $result;
+            }
+            if (empty($url['path'])) {
+                LogService::warning("Could not parse (empty) path of redirected Location header '$location' for Service with id '$service->id'");
+                $notes[] = "Could not parse (empty) path of redirected Location header '$location'";
+                return $result;
+            }
+            $path = $path && preg_match('/^[^\/]*(\/.*\/).*$/m', $path, $urlPath) ? $urlPath[1] : '';
+            $path .= $url['path'];
+
+            fclose($resource);
+            $resource = self::createResource($service, $errorCode, $errorMessage);
+
+            LogService::debug("Redirecting Service with id '$service->id' to Location '$path'");
+            return self::getResponseForHttpAndHttps($resource, $service, $status, $notes, $path, ++$redirectionCounter);
         }
+        $status = Status::REACHABLE;
         return $result;
     }
 }
