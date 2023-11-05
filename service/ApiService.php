@@ -125,20 +125,18 @@ class ApiService {
         $timestamp->add(DateInterval::createFromDateString("$updateIntervalTolerance seconds"));
 
         LogService::warning("Add Status 'UNKNOWN' to Service with id '$currentServiceDto->id' due to inactivity on status checks for '$secondsSinceLatestUpdate' seconds");
-        $bla = new ServiceCheck($latestServiceDto->hostName,
+        return new ServiceCheck($latestServiceDto->hostName,
             $latestServiceDto->port,
             $latestServiceDto->socketProtocol,
             $latestServiceDto->fullHostName,
             $timestamp,
-            $latestServiceDto->latency,
-            $latestServiceDto->ipv4,
-            $latestServiceDto->ipv6,
-            $latestServiceDto->forwardedHost,
+            0,
+            'unknown',
+            'unknown',
+            'unknown',
             Status::UNKNOWN,
-            $latestServiceDto->response,
+            [],
             ["Added this status due to data cleansing by server"]);
-        LogService::debug($bla);
-        return $bla;
     }
 
     private static function hasStatusChanged(ServiceCheck $currentServiceCheck, array $serviceChecks): bool {

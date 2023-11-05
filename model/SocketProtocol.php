@@ -11,7 +11,7 @@ enum SocketProtocol: string {
     case UDP = "UDP";
 
     public static function parse(string $socketProtocol): SocketProtocol {
-        return match ($socketProtocol) {
+        return match (strtoupper($socketProtocol)) {
             self::TCP->value => self::TCP,
             self::HTTP->value => self::HTTP,
             self::HTTPS->value => self::HTTPS,
